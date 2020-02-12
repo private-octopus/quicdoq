@@ -3,3 +3,8 @@
 ################################################################################
 
 /.vs/quicdoq/v16
+/quicdoq/.vs/quicdoq/v16
+/quicdoq/x64/Debug
+/quicdoq_test/x64/Debug
+/quicdoq_unittest/x64/Debug
+/x64/Debug
