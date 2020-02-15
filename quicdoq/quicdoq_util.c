@@ -80,7 +80,7 @@ uint8_t* quicdoq_sprintf(uint8_t* text, uint8_t* text_max, const char* fmt, ...)
 #endif
         va_end(args);
 
-        if (res < 0 || res > buf_len) {
+        if (res < 0 || (unsigned) res > buf_len) {
             text = NULL;
         }
         else {
@@ -185,7 +185,7 @@ uint8_t * NormalizeNamePart(size_t length, uint8_t* value,
 /* Create a DNS Request from name and type.
  * This can be used for tests and also for the demo application.
  */
-uint8_t* quicdog_format_name(uint8_t* data, uint8_t* data_max, char const* name)
+uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* name)
 {
     size_t l = 0;
     uint8_t* part_data;
@@ -265,7 +265,7 @@ uint8_t* quicdog_format_dns_query(uint8_t* data, uint8_t* data_max, char const* 
         *data++ = 0; *data++ = 1; /* adcount = 1, edns */
     }
     /* Encode the query itself */
-    data = quicdog_format_name(data, data_max, qname);
+    data = quicdog_format_dns_name(data, data_max, qname);
     if (data != NULL) {
         if (data + 4 < data_max) {
             *data++ = (uint8_t)(qtype >> 8);
@@ -386,6 +386,63 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
     }
 
     *text_start = text;
+
+    return start_next;
+}
+
+size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start)
+{
+    size_t l = 0;
+    size_t name_start = start;
+    size_t start_next = 0;
+    size_t name_index = 0;
+    size_t first_parts_end = 0;
+
+    while (start < length) {
+        l = packet[start];
+
+        if (l == 0)
+        {
+            /* end of parsing*/
+            start++;
+
+            if (start_next == 0) {
+                start_next = start;
+            }
+            break;
+        }
+        else if ((l & 0xC0) == 0xC0)
+        {
+            start_next = start + 2;
+            if (start_next > length)
+            {
+                /* error */
+                start_next = length;
+                break;
+            }
+        }
+        else if (l > 0x3F)
+        {
+            /* found an extension. Don't know how to parse it! */
+            name_index = 0;
+            start_next = length;
+            break;
+        }
+        else
+        {
+            /* add a label to the name. */
+            if (start + l + 1 > length)
+            {
+                /* format error */
+                start_next = length;
+                break;
+            }
+            else
+            {
+                start += l + 1;
+            }
+        }
+    }
 
     return start_next;
 }

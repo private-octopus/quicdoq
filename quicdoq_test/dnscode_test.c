@@ -96,7 +96,7 @@ int name_format_test()
         uint8_t * next = dns_name;
         size_t dns_length = 0;
 
-        next = quicdog_format_name(next, next + sizeof(dns_name), dnscode_testData[i].expected);
+        next = quicdog_format_dns_name(next, next + sizeof(dns_name), dnscode_testData[i].expected);
 
         if (next == NULL) {
             ret = -1;

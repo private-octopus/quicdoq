@@ -8,3 +8,16 @@
 /quicdoq_test/x64/Debug
 /quicdoq_unittest/x64/Debug
 /x64/Debug
+/Debug
+/quicdoq/Debug
+/quicdoq/Release
+/quicdoq/x64/Release
+/quicdoq_test/Debug/quicdoq_test.tlog
+/quicdoq_test/Debug
+/quicdoq_test/Release
+/quicdoq_test/x64/Release
+/quicdoq_unittest/Debug
+/quicdoq_unittest/Release
+/quicdoq_unittest/x64/Release
+/Release
+/x64/Release

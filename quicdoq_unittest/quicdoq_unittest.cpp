@@ -37,5 +37,12 @@ namespace quicdoqunittest
 
 			Assert::AreEqual(ret, 0);
 		}
+
+		TEST_METHOD(basic)
+		{
+			int ret = quicdoq_basic_test();
+
+			Assert::AreEqual(ret, 0);
+		}
 	};
 }

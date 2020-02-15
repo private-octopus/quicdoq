@@ -36,7 +36,6 @@ extern "C" {
 
 /* Forward reference */
 typedef struct st_quicdoq_stream_ctx_t quicdoq_stream_ctx_t;
-typedef struct st_quicdoq_ctx_t quicdoq_ctx_t;
 
 /* Quicdoc per connection context
  * This is the argument passed by the callback context.
@@ -47,7 +46,8 @@ typedef struct st_quicdoq_ctx_t quicdoq_ctx_t;
  */
 typedef struct st_quicdoq_cnx_ctx_t {
     picoquic_cnx_t* cnx;
-    quicdoq_ctx_t* quicdog_ctx;
+    int is_server;
+    struct st_quicdoq_ctx_t* quicdog_ctx;
     quicdoq_stream_ctx_t* first_stream;
     quicdoq_stream_ctx_t* last_stream;
 } quicdoq_cnx_ctx_t;
@@ -57,7 +57,9 @@ typedef struct st_quicdoq_ctx_t {
     picoquic_quic_t* quic; /* The quic context for the DoQ service */
     /* Todo: message passing and synchronization */
     /* Todo: sockets, etc */
-    quicdoq_cnx_ctx_t default_callback_ctx;
+    quicdoq_app_cb_fn app_cb_fn; /* Applcation callback function */
+    void* app_cb_ctx; /* callback_ctx provided to applications */
+    quicdoq_cnx_ctx_t default_callback_ctx; /* Default context provided to new connections */
 } quicdoq_ctx_t;
 
 /* DoQ stream handling */

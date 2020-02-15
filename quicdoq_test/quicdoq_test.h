@@ -30,6 +30,7 @@ int name_parse_test();
 int name_format_test();
 int dns_query_parse_test();
 int dns_query_format_test();
+int quicdoq_basic_test();
 
 #ifdef __cplusplus
 }

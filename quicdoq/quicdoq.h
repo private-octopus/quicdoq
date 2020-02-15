@@ -113,20 +113,21 @@
 extern "C" {
 #endif
 
-    /* DoQ error codes */
+/* DoQ ALPN */
+#define QUICDOQ_ALPN "doq"
+
+/* DoQ error codes */
 #define QUICDOQ_ERROR_INTERNAL 0x201
 
 
 /* Doq client return codes
  */
     typedef enum {
-        quicdoq_query_complete = 0,
-        quicdoq_query_cancelled,
-        quicdoq_query_server_reset,
-        quicdoq_query_server_fail,
-        quicdoq_response_complete,
-        quicdoq_response_cancelled,
-        quicdoq_response_failed
+        quicdoq_incoming_query = 0, /* Incoming callback query */
+        quicdoq_query_cancelled, /* Query cancelled before response provided */
+        quicdoq_response_complete, /* The response to the current query arrived. */
+        quicdoq_response_cancelled, /* The response to the current query was cancelled by the peer. */
+        quicdoq_query_failed  /* Query failed for reasons other than cancelled. */
     } quicdoc_query_return_enum;
 
     /* Definition of the callback function
@@ -134,32 +135,50 @@ extern "C" {
     typedef int (*quicdoq_app_cb_fn)(
         quicdoc_query_return_enum callback_code,
         void* callback_ctx,
-        struct st_quicdoq_query_ctx_t* query_ctx);
+        struct st_quicdoq_query_ctx_t* query_ctx,
+        uint64_t current_time);
 
     /* Definition of the query context */
     typedef struct st_quicdoq_query_ctx_t {
         char const* server_name; /* Server SNI in outgoing query, client SNI in incoming query */
-        const struct sockaddr* server_addr; /* Address for the server connection */
-        const struct sockaddr* client_addr; /* Address for the server connection */
-        uint64_t query_id; /* Unique ID of the query, assigned by the client */
+        struct sockaddr* server_addr; /* Address for the server connection */
+        struct sockaddr* client_addr; /* Address for the server connection */
+        uint16_t query_id; /* Unique ID of the query, assigned by the client */
         uint8_t* query; /* buffer holding the query */
-        size_t query_length; /* length of the query */
+        uint16_t query_max_size; /* length of the query */
+        uint16_t query_length; /* length of the query */
         uint8_t* response; /* buffer holding the response */
-        size_t response_max_size; /* size of the response buffer */
-        size_t response_size; /* size of the actual response */
-        quicdoq_app_cb_fn* client_cb; /* Callback function for this query */
+        uint16_t response_max_size; /* size of the response buffer */
+        uint16_t response_length; /* size of the actual response */
+        quicdoq_app_cb_fn client_cb; /* Callback function for this query */
         void* client_cb_ctx; /* callback context for this query */
         quicdoc_query_return_enum return_code;
     } quicdoq_query_ctx_t;
 
-    quicdoq_query_ctx_t* quicdoq_create_query_ctx(size_t query_length, size_t response_max_size);
+    quicdoq_query_ctx_t* quicdoq_create_query_ctx(uint16_t query_length, uint16_t response_max_size);
 
     void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx);
 
-    /* Context management functions */
-    int quicdoq_create(void** quicdoq_ctx, quicdoq_app_cb_fn* server_cb, void* server_callback_ctx);
+    /* Connection context management functions.
+     * The type quicdoq_ctx_t is treated here as an opaque pointer, to
+     * provide isolation between the app and the stack.
+     */
+    typedef struct st_quicdoq_ctx_t quicdoq_ctx_t;
+    quicdoq_ctx_t* quicdoq_create(quicdoq_app_cb_fn server_cb, void* server_callback_ctx,
+        char const* cert_file_name, char const* key_file_name, char const* cert_root_file_name,
+        uint64_t* simulated_time);
+    void quicdoq_delete(quicdoq_ctx_t* ctx);
 
-    void quicdoq_delete(void* quicdoq_ctx);
+    /* Query context management functions 
+     * Client side:
+     *  - quicdoq_post_query(): Post a new query
+     *  - quicdoq_cancel_query(): Abandon a previously posted query
+     *  - The response will come in a call to (*quicdoq_app_cb_fn)()
+     * Server side:
+     *  - the incoming query will come in a call to (*quicdoq_app_cb_fn)()
+     *  - quicdoq_post_response(): provide the response
+     *  - quicdoq_cancel_response(): terminate an incoming query without a response.
+     */
 
     int quicdoq_post_query(void* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
@@ -170,11 +189,13 @@ extern "C" {
     int quicdoq_cancel_response(void* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
     /* Utility functions for formatting DNS messages */
-    uint8_t* quicdog_format_name(uint8_t* data, uint8_t* data_max, char const* name);
+
+    uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* name);
     uint8_t* quicdog_format_dns_query(uint8_t* data, uint8_t* data_max, char const* qname,
         uint16_t id, uint16_t qclass, uint16_t qtype, uint16_t l_max);
     size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
         uint8_t** text_start, uint8_t* text_max);
+    size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start);
     size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
         uint8_t** text_start, uint8_t* text_max);
 

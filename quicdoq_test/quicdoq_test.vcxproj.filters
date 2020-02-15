@@ -18,6 +18,9 @@
     <ClCompile Include="dnscode_test.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="network_test.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="quicdoq_test.h">

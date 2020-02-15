@@ -129,14 +129,14 @@ int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, qu
 /* Create a per connection context when a connection is either requested or incoming */
 
 /*
- * DOQ client call back.
+ * DOQ call back.
  *
- * Create a context for each client connection.
+ * Create a context for each connection.
  * The context holds a list of per stream context, used for managing incoming 
  * and outgoing queries, and a pointer to the DoQ context.
  */
 
-quicdoq_cnx_ctx_t* quicdoq_callback_create_context(quicdoq_cnx_ctx_t* old_ctx)
+quicdoq_cnx_ctx_t* quicdoq_callback_create_context(quicdoq_cnx_ctx_t* old_ctx, int is_server)
 {
     quicdoq_cnx_ctx_t* ctx = (quicdoq_cnx_ctx_t*)
         malloc(sizeof(quicdoq_cnx_ctx_t));
@@ -146,6 +146,7 @@ quicdoq_cnx_ctx_t* quicdoq_callback_create_context(quicdoq_cnx_ctx_t* old_ctx)
         ctx->first_stream = NULL;
         ctx->last_stream = NULL;
         ctx->quicdog_ctx = old_ctx->quicdog_ctx;
+        ctx->is_server = is_server;
     }
     return ctx;
 }
@@ -159,7 +160,6 @@ void quicdoq_callback_delete_context(quicdoq_cnx_ctx_t* ctx)
         free(ctx);
     }
 }
-
 
 int quicdoq_callback(picoquic_cnx_t* cnx,
     uint64_t stream_id, uint8_t* bytes, size_t length,
@@ -176,7 +176,7 @@ int quicdoq_callback(picoquic_cnx_t* cnx,
         picoquic_close(cnx, PICOQUIC_TRANSPORT_INTERNAL_ERROR);
         return -1;
     } else if (ctx->cnx == NULL){
-        ctx = quicdoq_callback_create_context(ctx);
+        ctx = quicdoq_callback_create_context(ctx, 1);
         if (ctx == NULL) {
             /* cannot handle the connection */
             picoquic_close(cnx, PICOQUIC_TRANSPORT_INTERNAL_ERROR);
@@ -233,23 +233,83 @@ int quicdoq_callback(picoquic_cnx_t* cnx,
     return ret;
 }
 
-quicdoq_query_ctx_t* quicdoq_create_query_ctx(size_t query_length, size_t response_max_size)
+quicdoq_query_ctx_t* quicdoq_create_query_ctx(uint16_t query_max_size, uint16_t response_max_size)
 {
-    return NULL;
+    quicdoq_query_ctx_t* query_ctx = (quicdoq_query_ctx_t*)malloc(sizeof(quicdoq_query_ctx_t));
+
+    if (query_ctx != NULL) {
+        memset(query_ctx, 0, sizeof(quicdoq_query_ctx_t));
+        query_ctx->query = (uint8_t*)malloc(query_max_size);
+        query_ctx->response = (uint8_t*)malloc(response_max_size);
+        if (query_ctx->query == NULL || query_ctx->response == NULL) {
+            quicdoq_delete_query_ctx(query_ctx);
+            query_ctx = NULL;
+        }
+        else {
+            query_ctx->query_max_size = query_max_size;
+            query_ctx->response_max_size = response_max_size;
+        }
+    }
+    return query_ctx;
 }   
 
 void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx)
 {
-
+    if (query_ctx->query != NULL) {
+        free(query_ctx->query);
+        query_ctx->query = NULL;
+        query_ctx->query_max_size = 0;
+    }
+    if (query_ctx->response != NULL) {
+        free(query_ctx->response);
+        query_ctx->query = NULL;
+        query_ctx->response_max_size = 0;
+    }
+    free(query_ctx);
 }
 
-int quicdoq_create(void** quicdoq_ctx, quicdoq_app_cb_fn* server_cb, void* server_callback_ctx)
+/* Create a quidoq node with the associated context
+ */
+quicdoq_ctx_t * quicdoq_create(quicdoq_app_cb_fn server_cb, void* server_callback_ctx,
+    char const * cert_file_name, char const * key_file_name, char const * cert_root_file_name,
+    uint64_t * simulated_time)
 {
-    return 0;
+    quicdoq_ctx_t* ctx = (quicdoq_ctx_t*)malloc(sizeof(quicdoq_ctx_t));
+    if (ctx != NULL) {
+        uint64_t current_time;
+
+        memset(ctx, 0, sizeof(quicdoq_ctx_t));
+        if (simulated_time == NULL) {
+            current_time = picoquic_current_time();
+        }
+        else {
+            current_time = *simulated_time;
+        }
+
+        ctx->default_callback_ctx.quicdog_ctx = ctx;
+
+        ctx->quic = picoquic_create(64, cert_file_name, key_file_name, cert_root_file_name,
+            QUICDOQ_ALPN, quicdoq_callback, &ctx->default_callback_ctx, NULL, NULL, NULL, current_time, simulated_time,
+            NULL, NULL, 0);
+
+        if (ctx->quic == NULL) {
+            quicdoq_delete(ctx);
+            ctx = NULL;
+        }
+    }
+
+    return ctx;
 }
 
-void quicdoq_delete(void* quicdoq_ctx)
+/* Delete a quicdoq node and the associated context
+ */
+void quicdoq_delete(quicdoq_ctx_t* ctx)
 {
+    if (ctx->quic != NULL) {
+        picoquic_free(ctx->quic);
+        ctx->quic = NULL;
+    }
+    free(ctx);
 }
 
 int quicdoq_post_query(void* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx)

@@ -143,6 +143,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dnscode_test.c" />
+    <ClCompile Include="network_test.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="quicdoq_test.h" />
