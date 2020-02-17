@@ -50,7 +50,7 @@ add_executable(quicdoq_t
 )
 
 target_link_libraries(quicdoq_t
-    quidoq-core
+    quicdoq-core
     ${Picoquic_LIBRARIES}
     ${PTLS_LIBRARIES}
     ${OPENSSL_LIBRARIES}
