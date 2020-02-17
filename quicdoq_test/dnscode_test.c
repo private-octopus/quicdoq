@@ -125,7 +125,7 @@ static uint8_t dnscode_test_query0[] = {   1, 255, 0, 0,
 
 static char const* dnscode_test_query0_json =
 "{ \"ID\":511, \"QR\":0, \"Opcode\":0, \"AA\":0,\n\
-\"TC\":0, \"RD\":0, \"AD\":0, \"CD\":0, \"RCODE\":0,\n\
+\"TC\":0, \"RD\":0, \"RA\":0, \"AD\":0, \"CD\":0, \"RCODE\":0,\n\
 \"QDCOUNT\":1, \"ANCOUNT\":0, \"NSCOUNT\":0, \"ARCOUNT\":1,\n\
 \"QNAME\": \"example.com.\", \"QTYPE\":1, \"QCLASS\":0,\n\
 \"additionalRRs\": [\n\
