@@ -128,12 +128,12 @@ extern "C" {
         quicdoq_response_complete, /* The response to the current query arrived. */
         quicdoq_response_cancelled, /* The response to the current query was cancelled by the peer. */
         quicdoq_query_failed  /* Query failed for reasons other than cancelled. */
-    } quicdoc_query_return_enum;
+    } quicdoq_query_return_enum;
 
     /* Definition of the callback function
      */
     typedef int (*quicdoq_app_cb_fn)(
-        quicdoc_query_return_enum callback_code,
+        quicdoq_query_return_enum callback_code,
         void* callback_ctx,
         struct st_quicdoq_query_ctx_t* query_ctx,
         uint64_t current_time);
@@ -152,7 +152,7 @@ extern "C" {
         uint16_t response_length; /* size of the actual response */
         quicdoq_app_cb_fn client_cb; /* Callback function for this query */
         void* client_cb_ctx; /* callback context for this query */
-        quicdoc_query_return_enum return_code;
+        quicdoq_query_return_enum return_code;
     } quicdoq_query_ctx_t;
 
     quicdoq_query_ctx_t* quicdoq_create_query_ctx(uint16_t query_length, uint16_t response_max_size);
@@ -166,6 +166,7 @@ extern "C" {
     typedef struct st_quicdoq_ctx_t quicdoq_ctx_t;
     quicdoq_ctx_t* quicdoq_create(quicdoq_app_cb_fn server_cb, void* server_callback_ctx,
         char const* cert_file_name, char const* key_file_name, char const* cert_root_file_name,
+        quicdoq_app_cb_fn app_cb_fn, void * app_cb_ctx,
         uint64_t* simulated_time);
     void quicdoq_delete(quicdoq_ctx_t* ctx);
 
@@ -180,13 +181,13 @@ extern "C" {
      *  - quicdoq_cancel_response(): terminate an incoming query without a response.
      */
 
-    int quicdoq_post_query(void* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
+    int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
-    int quicdoq_cancel_query(void* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
+    int quicdoq_cancel_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
-    int quicdoq_post_response(void* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
+    int quicdoq_post_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
-    int quicdoq_cancel_response(void* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
+    int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
     /* Utility functions for formatting DNS messages */
 

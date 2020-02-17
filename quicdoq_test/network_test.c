@@ -30,9 +30,9 @@
 
 #ifdef _WINDOWS
 #ifdef _WINDOWS64
-#define QUICDOQ_PICOQUIC_DEFAULT_SOLUTION_DIR "..\\..\\picoquic\\"
+#define QUICDOQ_PICOQUIC_DEFAULT_SOLUTION_DIR "..\\..\\..\\picoquic\\"
 #else
-#define QUICDOQ_PICOQUIC_DEFAULT_SOLUTION_DIR "..\\picoquic\\"
+#define QUICDOQ_PICOQUIC_DEFAULT_SOLUTION_DIR "..\\..\\picoquic\\"
 #endif
 #else
 #define QUICDOQ_PICOQUIC_DEFAULT_SOLUTION_DIR "../picoquic/"
@@ -171,69 +171,69 @@ int quicdog_test_get_format_response(quicdoq_query_ctx_t* query_ctx)
     return ret;
 }
 
-void quicdoq_set_response_queue(quicdog_test_ctx_t* ctx, uint16_t qid)
+void quicdoq_set_response_queue(quicdog_test_ctx_t* test_ctx, uint16_t qid)
 {
-    uint64_t r_time = ctx->record[qid].query_arrival_time;
-    if (ctx->record[qid].queued_response->response_length > 0) {
-        r_time += ctx->scenario[qid].response_delay;
+    uint64_t r_time = test_ctx->record[qid].query_arrival_time;
+    if (test_ctx->record[qid].queued_response->response_length > 0) {
+        r_time += test_ctx->scenario[qid].response_delay;
     }
-    if (r_time < ctx->next_response_time) {
-        ctx->next_response_time = r_time;
-        ctx->next_response_id = qid;
+    if (r_time < test_ctx->next_response_time) {
+        test_ctx->next_response_time = r_time;
+        test_ctx->next_response_id = qid;
     }
 }
 
-void quicdoq_reset_response_queue(quicdog_test_ctx_t* ctx)
+void quicdoq_reset_response_queue(quicdog_test_ctx_t* test_ctx)
 {
-    ctx->next_response_id = ctx->nb_scenarios;
-    ctx->next_response_time = UINT64_MAX;
+    test_ctx->next_response_id = test_ctx->nb_scenarios;
+    test_ctx->next_response_time = UINT64_MAX;
 
-    for (uint16_t qid = 0; qid < ctx->nb_scenarios; qid++) {
-        if (ctx->record[qid].query_received && ctx->record[qid].queued_response != NULL) {
-            quicdoq_set_response_queue(ctx, qid);
+    for (uint16_t qid = 0; qid < test_ctx->nb_scenarios; qid++) {
+        if (test_ctx->record[qid].query_received && test_ctx->record[qid].queued_response != NULL) {
+            quicdoq_set_response_queue(test_ctx, qid);
         }
     }
 }
 
 int quicdoq_test_server_cb(
-    quicdoc_query_return_enum callback_code,
+    quicdoq_query_return_enum callback_code,
     void* callback_ctx,
     quicdoq_query_ctx_t* query_ctx,
     uint64_t current_time)
 {
     int ret = 0;
-    quicdog_test_ctx_t* ctx = (quicdog_test_ctx_t*)callback_ctx;
+    quicdog_test_ctx_t* test_ctx = (quicdog_test_ctx_t*)callback_ctx;
     uint16_t qid = quicdog_test_get_query_id(query_ctx);
 
     switch (callback_code) {
     case quicdoq_incoming_query: /* Incoming callback query */
-        if (qid > ctx->nb_scenarios || ctx->record[qid].query_received) {
+        if (qid > test_ctx->nb_scenarios || test_ctx->record[qid].query_received) {
             ret = -1;
         }
         else {
-            ctx->record[qid].query_arrival_time = ctx->simulated_time;
-            ctx->record[qid].query_received = 1;
+            test_ctx->record[qid].query_arrival_time = test_ctx->simulated_time;
+            test_ctx->record[qid].query_received = 1;
             /* queue the response */
-            if (!ctx->scenario[qid].is_success ||
+            if (!test_ctx->scenario[qid].is_success ||
                 quicdog_test_get_format_response(query_ctx) != 0) {
                 query_ctx->response_length = 0; /* This will trigger a cancellation */
             }
-            ctx->record[qid].queued_response = query_ctx;
-            quicdoq_set_response_queue(ctx, qid);
+            test_ctx->record[qid].queued_response = query_ctx;
+            quicdoq_set_response_queue(test_ctx, qid);
         }
         break;
     case quicdoq_query_cancelled: /* Query cancelled before response provided */
     case quicdoq_query_failed: /* Query failed for reasons other than cancelled. */
         /* remove response from queue, mark it cancelled */
-        if (qid > ctx->nb_scenarios || !ctx->record[qid].query_received || ctx->record[qid].queued_response) {
+        if (qid > test_ctx->nb_scenarios || !test_ctx->record[qid].query_received || test_ctx->record[qid].queued_response) {
             ret = -1;
         }
         else {
-            ctx->record[qid].queued_response = NULL;
-            ctx->record[qid].response_sent_time = ctx->simulated_time;
-            ctx->record[qid].server_error = 1;
+            test_ctx->record[qid].queued_response = NULL;
+            test_ctx->record[qid].response_sent_time = test_ctx->simulated_time;
+            test_ctx->record[qid].server_error = 1;
         }
-        quicdoq_reset_response_queue(ctx);
+        quicdoq_reset_response_queue(test_ctx);
         break;
     default: /* callback code not expected on server */
         ret = -1;
@@ -243,27 +243,27 @@ int quicdoq_test_server_cb(
     return ret;
 }
 
-int quicdoq_test_server_submit_response(quicdog_test_ctx_t* ctx)
+int quicdoq_test_server_submit_response(quicdog_test_ctx_t* test_ctx)
 {
     int ret = 0;
 
     /* Check whether the next query is ready */
-    if (ctx->next_response_id >= ctx->nb_scenarios ||
-        ctx->record[ctx->next_response_id].queued_response == NULL) {
+    if (test_ctx->next_response_id >= test_ctx->nb_scenarios ||
+        test_ctx->record[test_ctx->next_response_id].queued_response == NULL) {
         ret = -1;
     }
     else {
         /* submit the response */
-        if (ctx->record[ctx->next_response_id].queued_response->response_length > 0) {
-            ret = quicdoq_post_response(ctx, ctx->record[ctx->next_response_id].queued_response);
+        if (test_ctx->record[test_ctx->next_response_id].queued_response->response_length > 0) {
+            ret = quicdoq_post_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response);
         }
         else {
-            ret = quicdoq_cancel_response(ctx, ctx->record[ctx->next_response_id].queued_response);
+            ret = quicdoq_cancel_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response);
         }
-        ctx->record[ctx->next_response_id].queued_response = NULL;
-        ctx->record[ctx->next_response_id].response_sent_time = ctx->simulated_time;
+        test_ctx->record[test_ctx->next_response_id].queued_response = NULL;
+        test_ctx->record[test_ctx->next_response_id].response_sent_time = test_ctx->simulated_time;
 
-        quicdoq_reset_response_queue(ctx);
+        quicdoq_reset_response_queue(test_ctx);
     }
 
     return ret;
@@ -273,31 +273,31 @@ int quicdoq_test_server_submit_response(quicdog_test_ctx_t* ctx)
  */
 
 int quicdoq_test_client_cb(
-    quicdoc_query_return_enum callback_code,
+    quicdoq_query_return_enum callback_code,
     void* callback_ctx,
     quicdoq_query_ctx_t* query_ctx,
     uint64_t current_time)
 {
     int ret = 0;
-    quicdog_test_ctx_t* ctx = (quicdog_test_ctx_t*)callback_ctx;
+    quicdog_test_ctx_t* test_ctx = (quicdog_test_ctx_t*)callback_ctx;
     uint16_t qid = quicdog_test_get_query_id(query_ctx);
 
-    if (qid > ctx->nb_scenarios) {
+    if (qid > test_ctx->nb_scenarios) {
         ret = -1;
-    } if (ctx->record[qid].response_received) {
+    } if (test_ctx->record[qid].response_received) {
         ret = -1;
     }
     else {
-        ctx->record[qid].response_received = 1;
-        ctx->record[qid].response_arrival_time = ctx->simulated_time;
+        test_ctx->record[qid].response_received = 1;
+        test_ctx->record[qid].response_arrival_time = test_ctx->simulated_time;
 
         switch (callback_code) {
         case quicdoq_response_complete: /* The response to the current query arrived. */
             /* tabulate completed */
-            ctx->record[qid].is_success = 1;
+            test_ctx->record[qid].is_success = 1;
             break;
         case quicdoq_response_cancelled: /* The response to the current query was cancelled by the peer. */
-            ctx->record[qid].cancel_received = 1;
+            test_ctx->record[qid].cancel_received = 1;
             /* tabulate cancelled */
         case quicdoq_query_failed:  /* Query failed for reasons other than cancelled. */
             /* tabulate failed */
@@ -308,10 +308,10 @@ int quicdoq_test_client_cb(
         }
 
         /* Check whether there are still responses pending. */
-        ctx->all_query_served = 1;
-        for (uint16_t i = 0; i < ctx->nb_scenarios; i++) {
-            if (!ctx->record[i].response_received) {
-                ctx->all_query_served = 0;
+        test_ctx->all_query_served = 1;
+        for (uint16_t i = 0; i < test_ctx->nb_scenarios; i++) {
+            if (!test_ctx->record[i].response_received) {
+                test_ctx->all_query_served = 0;
                 break;
             }
         }
@@ -325,20 +325,20 @@ int quicdoq_test_client_cb(
     return ret;
 }
 
-int quicdoq_test_client_submit_query(quicdog_test_ctx_t* ctx)
+int quicdoq_test_client_submit_query(quicdog_test_ctx_t* test_ctx)
 {
     int ret = 0;
     quicdoq_query_ctx_t* query_ctx = NULL;
 
     /* Check whether the next query is ready */
-    if (ctx->next_query_id >= ctx->nb_scenarios ||
-        ctx->scenario[ctx->next_query_id].schedule_time < ctx->simulated_time ||
-        ctx->record[ctx->next_query_id].query_sent) {
+    if (test_ctx->next_query_id >= test_ctx->nb_scenarios ||
+        test_ctx->scenario[test_ctx->next_query_id].schedule_time < test_ctx->simulated_time ||
+        test_ctx->record[test_ctx->next_query_id].query_sent) {
         ret = -1;
     }
     else {
         /* create a query record */
-        quicdoq_query_ctx_t* query_ctx = quicdoq_create_query_ctx(512, 1024);
+        query_ctx = quicdoq_create_query_ctx(512, 1024);
     }
 
     if (query_ctx == NULL) {
@@ -352,8 +352,8 @@ int quicdoq_test_client_submit_query(quicdog_test_ctx_t* ctx)
         uint8_t* qbuf = query_ctx->query;
         uint8_t* qbuf_max = query_ctx->query + query_ctx->query_max_size;
 
-        (void)picoquic_sprintf(name_buf, sizeof(name_buf), &name_length, "%d.example.com", ctx->next_query_id);
-        qbuf = quicdog_format_dns_query(qbuf, qbuf_max, name_buf, ctx->next_query_id, 0, 1, query_ctx->response_max_size);
+        (void)picoquic_sprintf(name_buf, sizeof(name_buf), &name_length, "%d.example.com", test_ctx->next_query_id);
+        qbuf = quicdog_format_dns_query(qbuf, qbuf_max, name_buf, test_ctx->next_query_id, 0, 1, query_ctx->response_max_size);
         if (qbuf == NULL) {
             ret = -1;
         }
@@ -361,23 +361,23 @@ int quicdoq_test_client_submit_query(quicdog_test_ctx_t* ctx)
             query_ctx->query_length = (uint16_t)(qbuf - query_ctx->query);
 
             query_ctx->server_name = PICOQUIC_TEST_SNI;
-            query_ctx->client_addr = (struct sockaddr*) & ctx->client_addr;
-            query_ctx->server_addr = (struct sockaddr*) & ctx->server_addr;
+            query_ctx->client_addr = (struct sockaddr*) & test_ctx->client_addr;
+            query_ctx->server_addr = (struct sockaddr*) & test_ctx->server_addr;
             query_ctx->client_cb = quicdoq_test_client_cb;
-            query_ctx->client_cb_ctx = ctx;
+            query_ctx->client_cb_ctx = test_ctx;
 
-            ret = quicdoq_post_query(ctx->qd_client, query_ctx);
+            ret = quicdoq_post_query(test_ctx->qd_client, query_ctx);
         }
     }
 
     /* Set the context for the next query after that */
     if (ret == 0) {
-        ctx->next_query_id++;
-        if (ctx->next_query_id >= ctx->nb_scenarios) {
-            ctx->next_query_time = UINT64_MAX;
+        test_ctx->next_query_id++;
+        if (test_ctx->next_query_id >= test_ctx->nb_scenarios) {
+            test_ctx->next_query_time = UINT64_MAX;
         }
         else {
-            ctx->next_query_time = ctx->scenario[ctx->next_query_id].schedule_time;
+            test_ctx->next_query_time = test_ctx->scenario[test_ctx->next_query_id].schedule_time;
         }
     }
     else {
@@ -392,95 +392,98 @@ int quicdoq_test_client_submit_query(quicdog_test_ctx_t* ctx)
 /* Test context create and delete
  */
 
-void quicdoq_test_ctx_delete(quicdog_test_ctx_t* ctx)
+void quicdoq_test_ctx_delete(quicdog_test_ctx_t* test_ctx)
 {
-    if (ctx->qd_client != NULL) {
-        quicdoq_delete(ctx->qd_client);
-        ctx->qd_client = NULL;
+    if (test_ctx->qd_client != NULL) {
+        quicdoq_delete(test_ctx->qd_client);
+        test_ctx->qd_client = NULL;
     }
 
-    if (ctx->qd_server != NULL) {
-        quicdoq_delete(ctx->qd_server);
-        ctx->qd_server = NULL;
+    if (test_ctx->qd_server != NULL) {
+        quicdoq_delete(test_ctx->qd_server);
+        test_ctx->qd_server = NULL;
     }
 
-    if (ctx->client_link != NULL) {
-        picoquictest_sim_link_delete(ctx->client_link);
-        ctx->client_link = NULL;
+    if (test_ctx->client_link != NULL) {
+        picoquictest_sim_link_delete(test_ctx->client_link);
+        test_ctx->client_link = NULL;
     }
 
-    if (ctx->server_link != NULL) {
-        picoquictest_sim_link_delete(ctx->server_link);
-        ctx->server_link = NULL;
+    if (test_ctx->server_link != NULL) {
+        picoquictest_sim_link_delete(test_ctx->server_link);
+        test_ctx->server_link = NULL;
     }
 
-    free(ctx);
+    free(test_ctx);
 }
 
 quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const * scenario, size_t size_of_scenario)
 {
-    quicdog_test_ctx_t* ctx = (quicdog_test_ctx_t*)malloc(sizeof(quicdog_test_ctx_t));
+    quicdog_test_ctx_t* test_ctx = (quicdog_test_ctx_t*)malloc(sizeof(quicdog_test_ctx_t));
 
-    if (ctx != NULL) {
+    if (test_ctx != NULL) {
         int ret = 0;
-        memset(ctx, 0, sizeof(quicdog_test_ctx_t));
+        memset(test_ctx, 0, sizeof(quicdog_test_ctx_t));
         /* Locate the default cert, key and root in the Picoquic solution*/
-        ret = picoquic_get_input_path(ctx->test_server_cert_file, sizeof(ctx->test_server_cert_file), 
+        ret = picoquic_get_input_path(test_ctx->test_server_cert_file, sizeof(test_ctx->test_server_cert_file), 
             quicdoq_test_picoquic_solution_dir, PICOQUIC_TEST_FILE_SERVER_CERT);
 
         if (ret == 0) {
-            ret = picoquic_get_input_path(ctx->test_server_key_file, sizeof(ctx->test_server_key_file), 
+            ret = picoquic_get_input_path(test_ctx->test_server_key_file, sizeof(test_ctx->test_server_key_file), 
                 quicdoq_test_picoquic_solution_dir, PICOQUIC_TEST_FILE_SERVER_KEY);
         }
 
         if (ret == 0) {
-            ret = picoquic_get_input_path(ctx->test_server_cert_store_file, sizeof(ctx->test_server_cert_store_file), 
+            ret = picoquic_get_input_path(test_ctx->test_server_cert_store_file, sizeof(test_ctx->test_server_cert_store_file), 
                 quicdoq_test_picoquic_solution_dir, PICOQUIC_TEST_FILE_CERT_STORE);
         }
 
         /* Set test addresses for client and server */
         if (ret == 0) {
-            ret = picoquic_store_text_addr(&ctx->server_addr, "1::1", 443);
+            ret = picoquic_store_text_addr(&test_ctx->server_addr, "1::1", 443);
         }
 
         if (ret == 0) {
-            ret = picoquic_store_text_addr(&ctx->client_addr, "2::2", 12345);
+            ret = picoquic_store_text_addr(&test_ctx->client_addr, "2::2", 12345);
         }
 
         /* create the client and server contexts */
-        ctx->qd_server = quicdoq_create(quicdoq_test_server_cb, (void*) ctx,
-            NULL, NULL, ctx->test_server_cert_store_file, &ctx->simulated_time);
-        ctx->qd_client = quicdoq_create(quicdoq_test_client_cb, (void*)ctx,
-            ctx->test_server_cert_file, ctx->test_server_key_file, NULL, &ctx->simulated_time);
-
+        test_ctx->qd_server = quicdoq_create(quicdoq_test_client_cb, (void*)test_ctx,
+            test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL, 
+            quicdoq_test_server_cb, (void*)test_ctx,
+            &test_ctx->simulated_time);
+        test_ctx->qd_client = quicdoq_create(quicdoq_test_server_cb, (void*) test_ctx,
+            NULL, NULL, test_ctx->test_server_cert_store_file, 
+            quicdoq_test_client_cb, (void*)test_ctx,
+            &test_ctx->simulated_time);
 
         /* Create the simulation links */
-        ctx->server_link = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
-        ctx->client_link = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
+        test_ctx->server_link = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
+        test_ctx->client_link = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
 
         /* Insert the scenarios */
-        ctx->nb_scenarios = (uint16_t)(size_of_scenario / sizeof(quicdoq_test_scenario_entry_t));
-        ctx->scenario = scenario;
-        ctx->record = (quicdoq_test_scenario_record_t*)malloc(ctx->nb_scenarios * sizeof(quicdoq_test_scenario_record_t));
-        if (ctx->record != NULL) {
-            memset(ctx->record, 0, ctx->nb_scenarios * sizeof(quicdoq_test_scenario_record_t));
+        test_ctx->nb_scenarios = (uint16_t)(size_of_scenario / sizeof(quicdoq_test_scenario_entry_t));
+        test_ctx->scenario = scenario;
+        test_ctx->record = (quicdoq_test_scenario_record_t*)malloc(test_ctx->nb_scenarios * sizeof(quicdoq_test_scenario_record_t));
+        if (test_ctx->record != NULL) {
+            memset(test_ctx->record, 0, test_ctx->nb_scenarios * sizeof(quicdoq_test_scenario_record_t));
         }
-        ctx->next_query_time = ctx->scenario[0].schedule_time;
-        ctx->next_response_time = UINT64_MAX;
-        if (ret != 0 || ctx->qd_client == NULL || ctx->qd_server == NULL ||
-            ctx->server_link == NULL || ctx->client_link == NULL || ctx->record == NULL) {
-            quicdoq_test_ctx_delete(ctx);
-            ctx = NULL;
+        test_ctx->next_query_time = test_ctx->scenario[0].schedule_time;
+        test_ctx->next_response_time = UINT64_MAX;
+        if (ret != 0 || test_ctx->qd_client == NULL || test_ctx->qd_server == NULL ||
+            test_ctx->server_link == NULL || test_ctx->client_link == NULL || test_ctx->record == NULL) {
+            quicdoq_test_ctx_delete(test_ctx);
+            test_ctx = NULL;
         }
 
     }
-    return ctx;
+    return test_ctx;
 }
 
-int quicdoq_test_sim_packet_input(quicdog_test_ctx_t* ctx, picoquic_quic_t* quic, picoquictest_sim_link_t* link, int* is_active)
+int quicdoq_test_sim_packet_input(quicdog_test_ctx_t* test_ctx, picoquic_quic_t* quic, picoquictest_sim_link_t* link, int* is_active)
 {
     int ret = 0;
-    picoquictest_sim_packet_t* packet = picoquictest_sim_link_dequeue(link, ctx->simulated_time);
+    picoquictest_sim_packet_t* packet = picoquictest_sim_link_dequeue(link, test_ctx->simulated_time);
 
     if (packet == NULL) {
         /* unexpected, probably bug in test program */
@@ -491,14 +494,14 @@ int quicdoq_test_sim_packet_input(quicdog_test_ctx_t* ctx, picoquic_quic_t* quic
         ret = picoquic_incoming_packet(quic, packet->bytes, (uint32_t)packet->length,
             (struct sockaddr*) & packet->addr_from,
             (struct sockaddr*) & packet->addr_to, 0, 0,
-            ctx->simulated_time);
+            test_ctx->simulated_time);
         free(packet);
     }
 
     return ret;
 }
 
-int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* ctx, picoquic_quic_t* quic, picoquictest_sim_link_t* link, int* is_active)
+int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquic_quic_t* quic, picoquictest_sim_link_t* link, int* is_active)
 {
     int ret = 0;
     picoquictest_sim_packet_t* packet = picoquictest_sim_link_create_packet();
@@ -513,7 +516,7 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* ctx, picoquic_quic_t* qu
         /* check whether there is something to send */
         int if_index = 0;
 
-        ret = picoquic_prepare_next_packet(quic, ctx->simulated_time,
+        ret = picoquic_prepare_next_packet(quic, test_ctx->simulated_time,
             packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length,
             &packet->addr_to, &peer_addr_len, &packet->addr_from, &local_addr_len, &if_index);
 
@@ -522,13 +525,17 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* ctx, picoquic_quic_t* qu
             /* useless test, but makes it easier to add a breakpoint under debugger */
             ret = -1;
         }
+        else if (local_addr_len == 0) {
+            picoquic_store_addr(&packet->addr_from, (quic == test_ctx->qd_client) ?
+                (struct sockaddr*) & test_ctx->client_addr : (struct sockaddr*) & test_ctx->server_addr);
+        }
     }
 
     /* TODO: check that dest and srce address are what is expected */
 
     if (ret == 0 && packet->length > 0) {
         *is_active = 1;
-        picoquictest_sim_link_submit(link, packet, ctx->simulated_time);
+        picoquictest_sim_link_submit(link, packet, test_ctx->simulated_time);
     } else {
         free(packet);
     }
@@ -536,7 +543,7 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* ctx, picoquic_quic_t* qu
     return ret;
 }
 
-int quicdoq_test_sim_step(quicdog_test_ctx_t* ctx, int * is_active)
+int quicdoq_test_sim_step(quicdog_test_ctx_t* test_ctx, int * is_active)
 {
     int ret = 0;
     uint64_t next_time = UINT64_MAX;
@@ -545,59 +552,63 @@ int quicdoq_test_sim_step(quicdog_test_ctx_t* ctx, int * is_active)
 
     *is_active = 0;
 
-    if ((try_time = picoquic_get_next_wake_time(ctx->qd_client->quic, ctx->simulated_time)) < next_time) {
+    if ((try_time = picoquic_get_next_wake_time(test_ctx->qd_client->quic, test_ctx->simulated_time)) < next_time) {
         next_time = try_time;
         next_step = 0;
     }
 
-    if ((try_time = picoquic_get_next_wake_time(ctx->qd_server->quic, ctx->simulated_time)) < next_time) {
+    if ((try_time = picoquic_get_next_wake_time(test_ctx->qd_server->quic, test_ctx->simulated_time)) < next_time) {
         next_time = try_time;
         next_step = 1;
     }
 
-    if (ctx->client_link->first_packet != NULL &&
-        ctx->client_link->first_packet->arrival_time < next_time) {
-        next_time = ctx->client_link->first_packet->arrival_time;
+    if (test_ctx->client_link->first_packet != NULL &&
+        test_ctx->client_link->first_packet->arrival_time < next_time) {
+        next_time = test_ctx->client_link->first_packet->arrival_time;
         next_step = 2;
     }
 
-    if (ctx->server_link->first_packet != NULL &&
-        ctx->server_link->first_packet->arrival_time < next_time) {
-        next_time = ctx->server_link->first_packet->arrival_time;
+    if (test_ctx->server_link->first_packet != NULL &&
+        test_ctx->server_link->first_packet->arrival_time < next_time) {
+        next_time = test_ctx->server_link->first_packet->arrival_time;
         next_step = 3;
     }
 
-    if (ctx->next_query_time < next_time) {
-        next_time = ctx->next_query_time;
+    if (test_ctx->next_query_time < next_time) {
+        next_time = test_ctx->next_query_time;
         next_step = 4;
     }
 
-    if (ctx->next_response_time < next_time) {
-        next_time = ctx->next_response_time;
+    if (test_ctx->next_response_time < next_time) {
+        next_time = test_ctx->next_response_time;
         next_step = 5;
     }
 
     /* Update the virtual time */
-    if (next_time > ctx->simulated_time) {
-        ctx->simulated_time = next_time;
+    if (next_time > test_ctx->simulated_time) {
+        test_ctx->simulated_time = next_time;
     }
 
     /* Execute the most urgent action. */
-    switch (try_time) {
+    switch (next_step) {
     case 0:
-        ret = quicdoq_test_sim_packet_prepare(ctx, ctx->qd_client->quic, ctx->server_link, is_active);
+        ret = quicdoq_test_sim_packet_prepare(test_ctx, test_ctx->qd_client->quic, test_ctx->server_link, is_active);
         break;
     case 1:
-        ret = quicdoq_test_sim_packet_prepare(ctx, ctx->qd_server->quic, ctx->client_link, is_active);
+        ret = quicdoq_test_sim_packet_prepare(test_ctx, test_ctx->qd_server->quic, test_ctx->client_link, is_active);
         break;
     case 2:
-        ret = quicdoq_test_sim_packet_input(ctx, ctx->qd_client->quic, ctx->client_link, is_active);
+        ret = quicdoq_test_sim_packet_input(test_ctx, test_ctx->qd_client->quic, test_ctx->client_link, is_active);
         break;
     case 3:
-        ret = quicdoq_test_sim_packet_input(ctx, ctx->qd_server->quic, ctx->server_link, is_active);
+        ret = quicdoq_test_sim_packet_input(test_ctx, test_ctx->qd_server->quic, test_ctx->server_link, is_active);
         break;
     case 4:
-
+        ret = quicdoq_test_client_submit_query(test_ctx);
+        break;
+    case 5:
+        ret = quicdoq_test_server_submit_response(test_ctx);
+        break;
     /* TODO: per scenario actions */
     default:
         /* Nothing to do, which is unlikely since the server is always up. */
@@ -608,14 +619,14 @@ int quicdoq_test_sim_step(quicdog_test_ctx_t* ctx, int * is_active)
     return ret;
 }
 
-int quicdoq_test_sim_run(quicdog_test_ctx_t* ctx, uint64_t time_limit)
+int quicdoq_test_sim_run(quicdog_test_ctx_t* test_ctx, uint64_t time_limit)
 {
     int ret = 0;
     int is_active = 0;
     int inactive_count = 0;
 
-    while (ret == 0 && !ctx->all_query_served && inactive_count < 1204 && ctx->simulated_time < time_limit) {
-        ret = quicdoq_test_sim_step(ctx, &is_active);
+    while (ret == 0 && !test_ctx->all_query_served && inactive_count < 1204 && test_ctx->simulated_time < time_limit) {
+        ret = quicdoq_test_sim_step(test_ctx, &is_active);
 
         if (is_active) {
             inactive_count = 0;
@@ -635,21 +646,21 @@ static quicdoq_test_scenario_entry_t const basic_scenario[] = {
 
 int quicdoq_basic_test()
 {
-    quicdog_test_ctx_t* ctx = quicdoq_test_ctx_create(basic_scenario, sizeof(basic_scenario));
+    quicdog_test_ctx_t* test_ctx = quicdoq_test_ctx_create(basic_scenario, sizeof(basic_scenario));
     int ret = 0;
 
-    if (ctx == NULL) {
+    if (test_ctx == NULL) {
         ret = -1;
     }
     else {
-        ret = quicdoq_test_sim_run(ctx, 3000000);
+        ret = quicdoq_test_sim_run(test_ctx, 3000000);
 
-        if (ret != 0 || !ctx->all_query_served) {
+        if (ret != 0 || !test_ctx->all_query_served) {
             DBG_PRINTF("Fail after %llu, all_served=%d, ret=%d",
-                (unsigned long long)ctx->simulated_time, ctx->all_query_served, ret);
+                (unsigned long long)test_ctx->simulated_time, test_ctx->all_query_served, ret);
             ret = -1;
         }
-        quicdoq_test_ctx_delete(ctx);
+        quicdoq_test_ctx_delete(test_ctx);
     }
 
     return ret;

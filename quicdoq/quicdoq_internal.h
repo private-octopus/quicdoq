@@ -45,11 +45,19 @@ typedef struct st_quicdoq_stream_ctx_t quicdoq_stream_ctx_t;
  * for that connection.
  */
 typedef struct st_quicdoq_cnx_ctx_t {
+    struct st_quicdoq_cnx_ctx_t* next_cnx;
+    struct st_quicdoq_cnx_ctx_t* previous_cnx;
+    struct st_quicdoq_ctx_t* quicdoq_ctx;
+
+    char* sni;
+    struct sockaddr_storage addr;
     picoquic_cnx_t* cnx;
     int is_server;
-    struct st_quicdoq_ctx_t* quicdog_ctx;
+
+    uint64_t next_available_stream_id; /* starts with stream 0 on client */
     quicdoq_stream_ctx_t* first_stream;
     quicdoq_stream_ctx_t* last_stream;
+
 } quicdoq_cnx_ctx_t;
 
 /* Quicdoq context */
@@ -57,9 +65,11 @@ typedef struct st_quicdoq_ctx_t {
     picoquic_quic_t* quic; /* The quic context for the DoQ service */
     /* Todo: message passing and synchronization */
     /* Todo: sockets, etc */
-    quicdoq_app_cb_fn app_cb_fn; /* Applcation callback function */
+    quicdoq_app_cb_fn app_cb_fn; /* Application callback function */
     void* app_cb_ctx; /* callback_ctx provided to applications */
     quicdoq_cnx_ctx_t default_callback_ctx; /* Default context provided to new connections */
+    struct st_quicdoq_cnx_ctx_t* first_cnx; /* First in double linked list of open connections in this context */
+    struct st_quicdoq_cnx_ctx_t* last_cnx; /* last in list of open connections in this context */
 } quicdoq_ctx_t;
 
 /* DoQ stream handling */
@@ -67,27 +77,29 @@ typedef struct st_quicdoq_stream_ctx_t {
     uint64_t stream_id;
     quicdoq_stream_ctx_t* next_stream;
     quicdoq_stream_ctx_t* previous_stream;
+    quicdoq_cnx_ctx_t* cnx_ctx;
     quicdoq_query_ctx_t* query_ctx;
+    size_t bytes_sent;
 
     unsigned int client_mode : 1;
 } quicdoq_stream_ctx_t;
 
 quicdoq_stream_ctx_t* quicdoq_find_or_create_stream(
     uint64_t stream_id,
-    quicdoq_cnx_ctx_t* ctx,
+    quicdoq_cnx_ctx_t* cnx_ctx,
     int should_create);
 
-void quicdoq_delete_stream_ctx(quicdoq_cnx_ctx_t* ctx, quicdoq_stream_ctx_t* stream_ctx);
+void quicdoq_delete_stream_ctx(quicdoq_cnx_ctx_t* cnx_ctx, quicdoq_stream_ctx_t* stream_ctx);
 
 int quicdoq_callback(picoquic_cnx_t* cnx,
     uint64_t stream_id, uint8_t* bytes, size_t length,
     picoquic_call_back_event_t fin_or_event, void* callback_ctx, void* v_stream_ctx);
 
 int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx, uint64_t stream_id, uint8_t* bytes,
-    size_t length, picoquic_call_back_event_t fin_or_event, quicdoq_cnx_ctx_t* callback_ctx);
+    size_t length, picoquic_call_back_event_t fin_or_event, quicdoq_cnx_ctx_t* cnx_ctx);
 
 int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, quicdoq_stream_ctx_t* stream_ctx,
-    void* bytes, size_t length, quicdoq_cnx_ctx_t* ctx);
+    void* bytes, size_t length, quicdoq_cnx_ctx_t* cnx_ctx);
 
 #ifdef __cplusplus
 }
