@@ -70,7 +70,7 @@ int name_parse_test()
         if (name_x == NULL) {
             ret = -1;
         } else {
-            name_length = name_x - name_out;
+            name_length = name_x - (uint8_t*)name_out;
             *name_x = 0;
         }
 
@@ -147,7 +147,7 @@ int dns_query_parse_test()
         ret = -1;
     }
     else {
-        query_length = query_x - query_out;
+        query_length = query_x - (uint8_t*)query_out;
         *query_x = 0;
 
         if (next != sizeof(dnscode_test_query0)) {
