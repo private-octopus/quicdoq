@@ -26,6 +26,8 @@
 extern "C" {
 #endif
 
+extern char const* quicdoq_test_picoquic_solution_dir;
+
 int name_parse_test();
 int name_format_test();
 int dns_query_parse_test();

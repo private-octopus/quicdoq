@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quicdoq_unittest", "quicdoq
 		{D3B1D9E7-A473-471A-B613-F803EA9284FA} = {D3B1D9E7-A473-471A-B613-F803EA9284FA}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quicdoq_cli_test", "quicdoq_cli_test\quicdoq_cli_test.vcxproj", "{5F3CC205-F0C8-4A92-BADA-88F24758526F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -45,6 +47,14 @@ Global
 		{6B62DECB-BAE7-410A-9118-2F0CE3C589A1}.Release|x64.Build.0 = Release|x64
 		{6B62DECB-BAE7-410A-9118-2F0CE3C589A1}.Release|x86.ActiveCfg = Release|Win32
 		{6B62DECB-BAE7-410A-9118-2F0CE3C589A1}.Release|x86.Build.0 = Release|Win32
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Debug|x64.ActiveCfg = Debug|x64
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Debug|x64.Build.0 = Debug|x64
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Debug|x86.ActiveCfg = Debug|Win32
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Debug|x86.Build.0 = Debug|Win32
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Release|x64.ActiveCfg = Release|x64
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Release|x64.Build.0 = Release|x64
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Release|x86.ActiveCfg = Release|Win32
+		{5F3CC205-F0C8-4A92-BADA-88F24758526F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
