@@ -13,7 +13,7 @@ find_library(Picoquic_CORE_LIBRARY picoquic-core HINTS ${Picoquic_HINTS})
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set Picoquic_FOUND to TRUE
 # if all listed variables are TRUE
-find_package_handle_standard_args(PTLS REQUIRED_VARS
+find_package_handle_standard_args(Picoquic REQUIRED_VARS
     Picoquic_CORE_LIBRARY
     Picoquic_INCLUDE_DIR)
 
