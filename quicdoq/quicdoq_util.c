@@ -307,7 +307,6 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
     size_t l = 0;
     size_t name_start = start;
     size_t start_next = 0;
-    size_t name_index = 0;
     uint8_t* text = *text_start;
 
     while (start < length && text != NULL && text < text_max) {
@@ -344,7 +343,6 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
                 }
                 else {
                     /* Basic restriction to avoid name decoding loops */
-                    name_index = 0;
                     start_next = length;
                     break;
                 }
@@ -353,7 +351,6 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
         else if (l > 0x3F)
         {
             /* found an extension. Don't know how to parse it! */
-            name_index = 0;
             start_next = length;
             break;
         }
