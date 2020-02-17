@@ -2,8 +2,8 @@
 
 find_path(Picoquic_INCLUDE_DIR
     NAMES picoquic.h
-    HINTS ${CMAKE_SOURCE_DIR}/../picotls/picoquic
-          ${CMAKE_BINARY_DIR}/../picotls/picoquic
+    HINTS ${CMAKE_SOURCE_DIR}/../picoquic/picoquic
+          ${CMAKE_BINARY_DIR}/../picoquic/picoquic
           ../picotls/picoquic/ )
 
 set(Picoquic_HINTS ${CMAKE_BINARY_DIR}/../picoquic ../picoquic)
