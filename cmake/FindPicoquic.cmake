@@ -1,4 +1,4 @@
-# - Try to find Picotls
+# - Try to find Picoquic
 
 find_path(Picoquic_INCLUDE_DIR
     NAMES picoquic.h
@@ -11,7 +11,7 @@ set(Picoquic_HINTS ${CMAKE_BINARY_DIR}/../picoquic ../picoquic)
 find_library(Picoquic_CORE_LIBRARY picoquic-core HINTS ${Picoquic_HINTS})
 
 include(FindPackageHandleStandardArgs)
-# handle the QUIETLY and REQUIRED arguments and set PTLS_FOUND to TRUE
+# handle the QUIETLY and REQUIRED arguments and set Picoquic_FOUND to TRUE
 # if all listed variables are TRUE
 find_package_handle_standard_args(PTLS REQUIRED_VARS
     Picoquic_CORE_LIBRARY
