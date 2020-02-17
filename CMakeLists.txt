@@ -23,9 +23,9 @@ set(QUICDOQ_TEST_LIBRARY_FILES
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-find_package(PICOQUIC REQUIRED)
-message(STATUS "Picoquic/include: ${PICOQUIC_INCLUDE_DIRS}" )
-message(STATUS "Picoquic library: ${PICOQUIC_LIBRARIES}" )
+find_package(Picoquic REQUIRED)
+message(STATUS "Picoquic/include: ${Picoquic_INCLUDE_DIRS}" )
+message(STATUS "Picoquic library: ${Picoquic_LIBRARIES}" )
 
 find_package(PTLS REQUIRED)
 message(STATUS "picotls/include: ${PTLS_INCLUDE_DIRS}" )
@@ -38,7 +38,7 @@ message(STATUS "OpenSSL_INCLUDE_DIR: ${OPENSSL_INCLUDE_DIR}")
 message(STATUS "OpenSSL_LIBRARIES: ${OPENSSL_LIBRARIES}")
 
 include_directories(quicdoq quicdoq_test 
-    ${PICOQUIC_INCLUDE_DIRS} ${PTLS_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
+    ${Picoquic_INCLUDE_DIRS} ${PTLS_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
 
 add_library(quicdoq-core
     ${QUICDOQ_LIBRARY_FILES}
@@ -51,7 +51,7 @@ add_executable(quicdoq_t
 
 target_link_libraries(quicdoq_t
     quidoq-core
-    ${PICOQUIC_LIBRARIES}
+    ${Picoquic_LIBRARIES}
     ${PTLS_LIBRARIES}
     ${OPENSSL_LIBRARIES}
     ${CMAKE_DL_LIBS}
