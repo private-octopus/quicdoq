@@ -70,7 +70,7 @@ int name_parse_test()
         if (name_x == NULL) {
             ret = -1;
         } else {
-            name_length = name_x - name_out;
+            name_length = name_x - (uint8_t*)name_out;
             *name_x = 0;
         }
 
@@ -125,7 +125,7 @@ static uint8_t dnscode_test_query0[] = {   1, 255, 0, 0,
 
 static char const* dnscode_test_query0_json =
 "{ \"ID\":511, \"QR\":0, \"Opcode\":0, \"AA\":0,\n\
-\"TC\":0, \"RD\":0, \"AD\":0, \"CD\":0, \"RCODE\":0,\n\
+\"TC\":0, \"RD\":0, \"RA\":0, \"AD\":0, \"CD\":0, \"RCODE\":0,\n\
 \"QDCOUNT\":1, \"ANCOUNT\":0, \"NSCOUNT\":0, \"ARCOUNT\":1,\n\
 \"QNAME\": \"example.com.\", \"QTYPE\":1, \"QCLASS\":0,\n\
 \"additionalRRs\": [\n\
@@ -147,7 +147,7 @@ int dns_query_parse_test()
         ret = -1;
     }
     else {
-        query_length = query_x - query_out;
+        query_length = query_x - (uint8_t*)query_out;
         *query_x = 0;
 
         if (next != sizeof(dnscode_test_query0)) {

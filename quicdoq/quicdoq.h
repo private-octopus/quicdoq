@@ -132,10 +132,12 @@ extern "C" {
 
     /* Definition of the callback function
      */
+    typedef struct st_quicdoq_query_ctx_t quicdoq_query_ctx_t;
+
     typedef int (*quicdoq_app_cb_fn)(
         quicdoq_query_return_enum callback_code,
         void* callback_ctx,
-        struct st_quicdoq_query_ctx_t* query_ctx,
+        quicdoq_query_ctx_t* query_ctx,
         uint64_t current_time);
 
     /* Definition of the query context */

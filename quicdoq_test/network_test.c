@@ -501,7 +501,7 @@ int quicdoq_test_sim_packet_input(quicdog_test_ctx_t* test_ctx, picoquic_quic_t*
     return ret;
 }
 
-int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquic_quic_t* quic, picoquictest_sim_link_t* link, int* is_active)
+int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, quicdoq_ctx_t* quicdoq_ctx, picoquictest_sim_link_t* link, int* is_active)
 {
     int ret = 0;
     picoquictest_sim_packet_t* packet = picoquictest_sim_link_create_packet();
@@ -516,7 +516,7 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquic_quic_
         /* check whether there is something to send */
         int if_index = 0;
 
-        ret = picoquic_prepare_next_packet(quic, test_ctx->simulated_time,
+        ret = picoquic_prepare_next_packet(quicdoq_ctx->quic, test_ctx->simulated_time,
             packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length,
             &packet->addr_to, &peer_addr_len, &packet->addr_from, &local_addr_len, &if_index);
 
@@ -526,7 +526,7 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquic_quic_
             ret = -1;
         }
         else if (local_addr_len == 0) {
-            picoquic_store_addr(&packet->addr_from, (quic == test_ctx->qd_client) ?
+            picoquic_store_addr(&packet->addr_from, (quicdoq_ctx == test_ctx->qd_client) ?
                 (struct sockaddr*) & test_ctx->client_addr : (struct sockaddr*) & test_ctx->server_addr);
         }
     }
@@ -592,10 +592,10 @@ int quicdoq_test_sim_step(quicdog_test_ctx_t* test_ctx, int * is_active)
     /* Execute the most urgent action. */
     switch (next_step) {
     case 0:
-        ret = quicdoq_test_sim_packet_prepare(test_ctx, test_ctx->qd_client->quic, test_ctx->server_link, is_active);
+        ret = quicdoq_test_sim_packet_prepare(test_ctx, test_ctx->qd_client, test_ctx->server_link, is_active);
         break;
     case 1:
-        ret = quicdoq_test_sim_packet_prepare(test_ctx, test_ctx->qd_server->quic, test_ctx->client_link, is_active);
+        ret = quicdoq_test_sim_packet_prepare(test_ctx, test_ctx->qd_server, test_ctx->client_link, is_active);
         break;
     case 2:
         ret = quicdoq_test_sim_packet_input(test_ctx, test_ctx->qd_client->quic, test_ctx->client_link, is_active);

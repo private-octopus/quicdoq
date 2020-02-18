@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <picoquic.h>
 #include <picoquic_utils.h>
 #include "quicdoq.h"
@@ -306,8 +307,6 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
     size_t l = 0;
     size_t name_start = start;
     size_t start_next = 0;
-    size_t name_index = 0;
-    size_t first_parts_end = 0;
     uint8_t* text = *text_start;
 
     while (start < length && text != NULL && text < text_max) {
@@ -344,7 +343,6 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
                 }
                 else {
                     /* Basic restriction to avoid name decoding loops */
-                    name_index = 0;
                     start_next = length;
                     break;
                 }
@@ -353,7 +351,6 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
         else if (l > 0x3F)
         {
             /* found an extension. Don't know how to parse it! */
-            name_index = 0;
             start_next = length;
             break;
         }
@@ -393,10 +390,7 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
 size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start)
 {
     size_t l = 0;
-    size_t name_start = start;
     size_t start_next = 0;
-    size_t name_index = 0;
-    size_t first_parts_end = 0;
 
     while (start < length) {
         l = packet[start];
@@ -424,7 +418,6 @@ size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start)
         else if (l > 0x3F)
         {
             /* found an extension. Don't know how to parse it! */
-            name_index = 0;
             start_next = length;
             break;
         }
@@ -585,7 +578,9 @@ size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
         text = quicdoq_add_string(text, text_max, ", ", 2);
         text = quicdoq_add_label_num(text, text_max, "RD", RD);
         text = quicdoq_add_string(text, text_max, ", ", 2);
-        text = quicdoq_add_label_num(text, text_max, "AD", TC);
+        text = quicdoq_add_label_num(text, text_max, "RA", RA);
+        text = quicdoq_add_string(text, text_max, ", ", 2);
+        text = quicdoq_add_label_num(text, text_max, "AD", AD);
         text = quicdoq_add_string(text, text_max, ", ", 2);
         text = quicdoq_add_label_num(text, text_max, "CD", CD);
         text = quicdoq_add_string(text, text_max, ", ", 2);
