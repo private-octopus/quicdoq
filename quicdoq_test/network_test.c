@@ -598,8 +598,6 @@ int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_s
 {
     int ret = 0;
     picoquictest_sim_packet_t* packet = picoquictest_sim_link_create_packet();
-    int peer_addr_len = 0;
-    int local_addr_len = 0;
 
     if (packet == NULL) {
         /* memory error during test. Something is really wrong. */
@@ -607,8 +605,6 @@ int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_s
     }
     else {
         /* check whether there is something to send */
-        int if_index = 0;
-        
         quicdoq_udp_prepare_next_packet(test_ctx->udp_ctx, test_ctx->simulated_time,
             packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length);
     }
