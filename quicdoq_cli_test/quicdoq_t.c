@@ -28,8 +28,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-extern size_t picohttp_nb_stress_clients;
-
 typedef struct st_picoquic_test_def_t {
     char const* test_name;
     int (*test_fn)();
@@ -47,7 +45,8 @@ static const picoquic_test_def_t test_table[] = {
     { "name_format", name_format_test },
     { "dns_query_parse", dns_query_parse_test },
     { "dns_query_format", dns_query_format_test },
-    { "basic", quicdoq_basic_test }
+    { "basic", quicdoq_basic_test },
+    { "basic_udp", quicdoq_basic_udp_test }
 };
 
 static size_t const nb_tests = sizeof(test_table) / sizeof(picoquic_test_def_t);

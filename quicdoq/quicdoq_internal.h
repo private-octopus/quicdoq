@@ -101,6 +101,46 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
 int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, quicdoq_stream_ctx_t* stream_ctx,
     void* bytes, size_t length, quicdoq_cnx_ctx_t* cnx_ctx);
 
+/* Handling of UDP relay */
+
+#define QUICDOQ_UDP_MAX_REPEAT 4
+#define QUICDOQ_UDP_DEFAULT_RTO 250000
+
+typedef struct st_quicdog_udp_queued_t {
+    struct st_quicdog_udp_queued_t* next;
+    struct st_quicdog_udp_queued_t* previous;
+
+    quicdoq_query_ctx_t* query_ctx;
+    uint64_t next_send_time;
+    int nb_sent;
+    uint16_t udp_query_id;
+} quicdog_udp_queued_t;
+
+typedef struct st_quicdoq_udp_ctx_t {
+    struct sockaddr_storage udp_addr;
+    uint64_t next_wake_time;
+    quicdoq_ctx_t* quicdoq_ctx;
+
+    quicdog_udp_queued_t* first_query;
+    quicdog_udp_queued_t* last_query;
+
+    uint64_t srtt;
+    uint64_t drtt;
+    uint64_t rtt_min;
+    uint64_t rto;
+
+    uint16_t next_id;
+} quicdoq_udp_ctx_t;
+
+quicdoq_udp_ctx_t* quicdoq_create_udp_ctx(quicdoq_ctx_t* quicdoq_ctx, struct sockaddr* addr);
+void quicdoq_delete_udp_ctx(quicdoq_udp_ctx_t* udp_ctx);
+int quicdoq_udp_callback(quicdoq_query_return_enum callback_code, void* callback_ctx, 
+    quicdoq_query_ctx_t* query_ctx, uint64_t current_time);
+void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
+    uint64_t current_time, uint8_t* send_buffer, size_t send_buffer_max, size_t* send_length);
+void quicdoq_udp_incoming_packet(quicdoq_udp_ctx_t* udp_ctx,
+    uint8_t* bytes, size_t length, uint64_t current_time);
+
 #ifdef __cplusplus
 }
 #endif
