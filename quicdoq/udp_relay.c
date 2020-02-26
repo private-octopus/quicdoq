@@ -161,7 +161,7 @@ int quicdoq_udp_callback(
             else {
                 /* Add the query to the pending queue.
                  * update the sending time. */
-                memset(quq_ctx, 0, sizeof(quq_ctx));
+                memset(quq_ctx, 0, sizeof(quicdog_udp_queued_t));
                 quq_ctx->query_ctx = query_ctx;
                 quq_ctx->next_send_time = current_time;
                 quq_ctx->udp_query_id = udp_ctx->next_id++;
