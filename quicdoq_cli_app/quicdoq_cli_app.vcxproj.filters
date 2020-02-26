@@ -15,21 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="quicdoq.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="quicdoq_internal.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="quicdoq.c">
+    <ClCompile Include="quicdoq_app.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="quicdoq_util.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="udp_relay.c">
+    <ClCompile Include="..\quicdoq_cli_test\getopt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

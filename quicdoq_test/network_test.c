@@ -92,6 +92,7 @@ typedef struct st_quicdoq_test_scenario_record_t {
     uint64_t response_sent_time;
     uint64_t response_arrival_time;
     quicdoq_query_ctx_t* queued_response;
+    picoquictest_sim_packet_t* queued_packet;
     int query_sent;
     int query_received;
     int server_error;
@@ -100,19 +101,22 @@ typedef struct st_quicdoq_test_scenario_record_t {
     int is_success;
 } quicdoq_test_scenario_record_t;
 
-
 /* Text context, holding all the state of the ongoing simulation */
 typedef struct st_quicdog_test_ctx_t {
     uint64_t simulated_time;
     quicdoq_ctx_t* qd_client;
     quicdoq_ctx_t* qd_server;
+    quicdoq_udp_ctx_t* udp_ctx;
     struct sockaddr_storage server_addr;
     struct sockaddr_storage client_addr;
+    struct sockaddr_storage udp_addr;
     char test_server_cert_file[512];
     char test_server_key_file[512];
     char test_server_cert_store_file[512];
     picoquictest_sim_link_t* server_link;
     picoquictest_sim_link_t* client_link;
+    picoquictest_sim_link_t* udp_link_out;
+    picoquictest_sim_link_t* udp_link_in;
     uint16_t nb_scenarios;
     quicdoq_test_scenario_entry_t const* scenario;
     quicdoq_test_scenario_record_t* record;
@@ -136,33 +140,37 @@ uint16_t quicdog_test_get_query_id(quicdoq_query_ctx_t* query_ctx)
     return qid;
 }
 
-int quicdog_test_get_format_response(quicdoq_query_ctx_t* query_ctx)
+int quicdog_test_get_format_response(
+    uint8_t * query, size_t query_length, 
+    uint8_t * response, size_t response_max_size, size_t * response_length)
 {
     int ret = -1;
     const uint8_t rr_a[] = { 0xC0, 12, 0, 1, 0, 0, 0, 4, 0, 0, 32, 0, 10, 0, 0, 1 };
     uint16_t qtype = UINT16_MAX;
     uint16_t qclass = UINT16_MAX;
 
-    if (sizeof(rr_a) + query_ctx->query_length <= (size_t)query_ctx->response_max_size && query_ctx->query_length > 12) {
+    if (sizeof(rr_a) + query_length <= (size_t) response_max_size && query_length > 12) {
         /* Parse the DNS query to find the end of the first query */
-        uint16_t after_q = (uint16_t)quicdoq_skip_dns_name(query_ctx->query, query_ctx->query_length, 12);
-        if (after_q + 4 <= query_ctx->query_length) {
-            qtype = (query_ctx->query[after_q] << 8) | query_ctx->query[after_q + 1];
-            qclass = (query_ctx->query[after_q + 2] << 8) | query_ctx->query[after_q + 3];
+        uint16_t after_q = (uint16_t)quicdoq_skip_dns_name(query, query_length, 12);
+        if (after_q + 4 <= query_length) {
+            qtype = (query[after_q] << 8) | query[after_q + 1];
+            qclass = (query[after_q + 2] << 8) | query[after_q + 3];
             after_q += 4;
         }
+
         if (qtype == 1 && qclass == 0) {
+            uint16_t r_index = 0;
             /* Insert the RR between query and EDNS */
-            memcpy(query_ctx->response, query_ctx->query, after_q);
-            query_ctx->response_length = (uint16_t)after_q;
-            memcpy(query_ctx->response + query_ctx->response_length, rr_a, sizeof(rr_a));
-            query_ctx->response_length += (uint16_t)sizeof(rr_a);
-            memcpy(query_ctx->response + query_ctx->response_length, query_ctx->query + after_q, query_ctx->query_length - after_q);
-            query_ctx->response_length += query_ctx->query_length - after_q;
+            memcpy(response, query, after_q);
+            r_index = (uint16_t)after_q;
+            memcpy(response + r_index, rr_a, sizeof(rr_a));
+            r_index += (uint16_t)sizeof(rr_a);
+            memcpy(response + r_index, query + after_q, query_length - after_q);
+            *response_length = query_length + sizeof(rr_a);
             /* Set the QR bit to 1 */
-            query_ctx->response[2] |= 128;
+            response[2] |= 128;
             /* Set the AN count to 1 */
-            query_ctx->response[7] = 0;
+            response[7] = 1;
             /* Success! */
             ret = 0;
         }
@@ -171,26 +179,35 @@ int quicdog_test_get_format_response(quicdoq_query_ctx_t* query_ctx)
     return ret;
 }
 
-void quicdoq_set_response_queue(quicdog_test_ctx_t* test_ctx, uint16_t qid)
+void quicdoq_set_test_response_queue(quicdog_test_ctx_t* test_ctx, uint16_t qid)
 {
-    uint64_t r_time = test_ctx->record[qid].query_arrival_time;
-    if (test_ctx->record[qid].queued_response->response_length > 0) {
-        r_time += test_ctx->scenario[qid].response_delay;
+    uint64_t r_time = UINT64_MAX;
+
+    if (test_ctx->record[qid].queued_response != NULL){  
+        r_time = test_ctx->record[qid].query_arrival_time;
+        if (test_ctx->record[qid].queued_response->response_length > 0) {
+            r_time += test_ctx->scenario[qid].response_delay;
+        }
     }
+    else if (test_ctx->record[qid].queued_packet != NULL) {
+        r_time = test_ctx->record[qid].queued_packet->arrival_time;
+    }
+
     if (r_time < test_ctx->next_response_time) {
         test_ctx->next_response_time = r_time;
         test_ctx->next_response_id = qid;
     }
 }
 
-void quicdoq_reset_response_queue(quicdog_test_ctx_t* test_ctx)
+void quicdoq_reset_test_response_queue(quicdog_test_ctx_t* test_ctx)
 {
     test_ctx->next_response_id = test_ctx->nb_scenarios;
     test_ctx->next_response_time = UINT64_MAX;
 
     for (uint16_t qid = 0; qid < test_ctx->nb_scenarios; qid++) {
-        if (test_ctx->record[qid].query_received && test_ctx->record[qid].queued_response != NULL) {
-            quicdoq_set_response_queue(test_ctx, qid);
+        if (test_ctx->record[qid].query_received && 
+            (test_ctx->record[qid].queued_response != NULL || test_ctx->record[qid].queued_packet != NULL)){
+            quicdoq_set_test_response_queue(test_ctx, qid);
         }
     }
 }
@@ -215,11 +232,12 @@ int quicdoq_test_server_cb(
             test_ctx->record[qid].query_received = 1;
             /* queue the response */
             if (!test_ctx->scenario[qid].is_success ||
-                quicdog_test_get_format_response(query_ctx) != 0) {
+                quicdog_test_get_format_response(query_ctx->query, query_ctx->query_length,
+                    query_ctx->response, query_ctx->response_max_size, &query_ctx->response_length) != 0) {
                 query_ctx->response_length = 0; /* This will trigger a cancellation */
             }
             test_ctx->record[qid].queued_response = query_ctx;
-            quicdoq_set_response_queue(test_ctx, qid);
+            quicdoq_set_test_response_queue(test_ctx, qid);
         }
         break;
     case quicdoq_query_cancelled: /* Query cancelled before response provided */
@@ -233,7 +251,7 @@ int quicdoq_test_server_cb(
             test_ctx->record[qid].response_sent_time = test_ctx->simulated_time;
             test_ctx->record[qid].server_error = 1;
         }
-        quicdoq_reset_response_queue(test_ctx);
+        quicdoq_reset_test_response_queue(test_ctx);
         break;
     default: /* callback code not expected on server */
         ret = -1;
@@ -258,12 +276,13 @@ int quicdoq_test_server_submit_response(quicdog_test_ctx_t* test_ctx)
             ret = quicdoq_post_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response);
         }
         else {
-            ret = quicdoq_cancel_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response);
+            ret = quicdoq_cancel_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response,
+                QUICDOQ_ERROR_INTERNAL);
         }
         test_ctx->record[test_ctx->next_response_id].queued_response = NULL;
         test_ctx->record[test_ctx->next_response_id].response_sent_time = test_ctx->simulated_time;
 
-        quicdoq_reset_response_queue(test_ctx);
+        quicdoq_reset_test_response_queue(test_ctx);
     }
 
     return ret;
@@ -399,6 +418,11 @@ void quicdoq_test_ctx_delete(quicdog_test_ctx_t* test_ctx)
         test_ctx->qd_client = NULL;
     }
 
+    if (test_ctx->udp_ctx != NULL) {
+        quicdoq_delete_udp_ctx(test_ctx->udp_ctx);
+        test_ctx->udp_ctx = NULL;
+    }
+
     if (test_ctx->qd_server != NULL) {
         quicdoq_delete(test_ctx->qd_server);
         test_ctx->qd_server = NULL;
@@ -414,10 +438,20 @@ void quicdoq_test_ctx_delete(quicdog_test_ctx_t* test_ctx)
         test_ctx->server_link = NULL;
     }
 
+    if (test_ctx->udp_link_in != NULL) {
+        picoquictest_sim_link_delete(test_ctx->udp_link_in);
+        test_ctx->udp_link_in = NULL;
+    }
+
+    if (test_ctx->udp_link_out != NULL) {
+        picoquictest_sim_link_delete(test_ctx->udp_link_out);
+        test_ctx->udp_link_out = NULL;
+    }
+
     free(test_ctx);
 }
 
-quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const * scenario, size_t size_of_scenario)
+quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const * scenario, size_t size_of_scenario, int test_udp)
 {
     quicdog_test_ctx_t* test_ctx = (quicdog_test_ctx_t*)malloc(sizeof(quicdog_test_ctx_t));
 
@@ -425,16 +459,16 @@ quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const 
         int ret = 0;
         memset(test_ctx, 0, sizeof(quicdog_test_ctx_t));
         /* Locate the default cert, key and root in the Picoquic solution*/
-        ret = picoquic_get_input_path(test_ctx->test_server_cert_file, sizeof(test_ctx->test_server_cert_file), 
+        ret = picoquic_get_input_path(test_ctx->test_server_cert_file, sizeof(test_ctx->test_server_cert_file),
             quicdoq_test_picoquic_solution_dir, PICOQUIC_TEST_FILE_SERVER_CERT);
 
         if (ret == 0) {
-            ret = picoquic_get_input_path(test_ctx->test_server_key_file, sizeof(test_ctx->test_server_key_file), 
+            ret = picoquic_get_input_path(test_ctx->test_server_key_file, sizeof(test_ctx->test_server_key_file),
                 quicdoq_test_picoquic_solution_dir, PICOQUIC_TEST_FILE_SERVER_KEY);
         }
 
         if (ret == 0) {
-            ret = picoquic_get_input_path(test_ctx->test_server_cert_store_file, sizeof(test_ctx->test_server_cert_store_file), 
+            ret = picoquic_get_input_path(test_ctx->test_server_cert_store_file, sizeof(test_ctx->test_server_cert_store_file),
                 quicdoq_test_picoquic_solution_dir, PICOQUIC_TEST_FILE_CERT_STORE);
         }
 
@@ -447,19 +481,36 @@ quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const 
             ret = picoquic_store_text_addr(&test_ctx->client_addr, "2::2", 12345);
         }
 
+        if (ret == 0) {
+            ret = picoquic_store_text_addr(&test_ctx->udp_addr, "3::3", 763);
+        }
+
         /* create the client and server contexts */
         test_ctx->qd_server = quicdoq_create(quicdoq_test_client_cb, (void*)test_ctx,
-            test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL, 
+            test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL,
             quicdoq_test_server_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
-        test_ctx->qd_client = quicdoq_create(quicdoq_test_server_cb, (void*) test_ctx,
-            NULL, NULL, test_ctx->test_server_cert_store_file, 
+        test_ctx->qd_client = quicdoq_create(quicdoq_test_server_cb, (void*)test_ctx,
+            NULL, NULL, test_ctx->test_server_cert_store_file,
             quicdoq_test_client_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
+
+        if (test_udp && test_ctx->qd_server != NULL) {
+            test_ctx->udp_ctx = quicdoq_create_udp_ctx(test_ctx->qd_server, (struct sockaddr*) & test_ctx->udp_addr);
+
+            if (test_ctx->udp_ctx != NULL) {
+                test_ctx->qd_server->app_cb_fn = quicdoq_udp_callback;
+                test_ctx->qd_server->app_cb_ctx = (void *)test_ctx->udp_ctx;
+            }
+        }
 
         /* Create the simulation links */
         test_ctx->server_link = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
         test_ctx->client_link = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
+        if (test_udp) {
+            test_ctx->udp_link_in = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
+            test_ctx->udp_link_out = picoquictest_sim_link_create(0.01, 10000, NULL, 0, 0);
+        }
 
         /* Insert the scenarios */
         test_ctx->nb_scenarios = (uint16_t)(size_of_scenario / sizeof(quicdoq_test_scenario_entry_t));
@@ -471,11 +522,11 @@ quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const 
         test_ctx->next_query_time = test_ctx->scenario[0].schedule_time;
         test_ctx->next_response_time = UINT64_MAX;
         if (ret != 0 || test_ctx->qd_client == NULL || test_ctx->qd_server == NULL ||
-            test_ctx->server_link == NULL || test_ctx->client_link == NULL || test_ctx->record == NULL) {
+            test_ctx->server_link == NULL || test_ctx->client_link == NULL || test_ctx->record == NULL ||
+            (test_udp && (test_ctx->udp_ctx == NULL || test_ctx->udp_link_in == NULL || test_ctx->udp_link_out == NULL))) {
             quicdoq_test_ctx_delete(test_ctx);
-            test_ctx = NULL;
+                test_ctx = NULL;
         }
-
     }
     return test_ctx;
 }
@@ -543,6 +594,139 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, quicdoq_ctx_t*
     return ret;
 }
 
+int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
+{
+    int ret = 0;
+    picoquictest_sim_packet_t* packet = picoquictest_sim_link_create_packet();
+
+    if (packet == NULL) {
+        /* memory error during test. Something is really wrong. */
+        ret = -1;
+    }
+    else {
+        /* check whether there is something to send */
+        quicdoq_udp_prepare_next_packet(test_ctx->udp_ctx, test_ctx->simulated_time,
+            packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length);
+    }
+
+    if (ret == 0 && packet->length > 0) {
+        *is_active = 1;
+        picoquic_store_addr(&packet->addr_to, (struct sockaddr *)&test_ctx->udp_ctx->udp_addr);
+        picoquic_store_addr(&packet->addr_from, (struct sockaddr*) & test_ctx->server_addr);
+        picoquictest_sim_link_submit(link, packet, test_ctx->simulated_time);
+    }
+    else {
+        free(packet);
+    }
+
+    return ret;
+}
+
+int quicdoq_test_sim_udp_input(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
+{
+    int ret = 0;
+    picoquictest_sim_packet_t* packet = picoquictest_sim_link_dequeue(link, test_ctx->simulated_time);
+
+    if (packet == NULL) {
+        /* unexpected, probably bug in test program */
+        ret = -1;
+    }
+    else {
+        *is_active = 1;
+        quicdoq_udp_incoming_packet(test_ctx->udp_ctx, packet->bytes, (uint32_t)packet->length, test_ctx->simulated_time);
+        free(packet);
+    }
+
+    return ret;
+}
+
+int quicdoq_test_sim_udp_output(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
+{
+    int ret = 0;
+    picoquictest_sim_packet_t* packet = picoquictest_sim_link_dequeue(link, test_ctx->simulated_time);
+
+    if (packet == NULL) {
+        /* unexpected, probably bug in test program */
+        ret = -1;
+    }
+    else {
+        /* Obtain the query ID from the name. */
+        uint16_t qid = 0;
+        uint8_t l = packet->bytes[12];
+
+        for (uint8_t x = 0; x < l; x++) {
+            int c = packet->bytes[13 + x];
+            if (c < '0' || c > '9') {
+                ret = -1;
+                break;
+            }
+            else {
+                qid = 10 * qid + c - '0';
+            }
+        }
+
+        if (ret == 0) {
+            picoquictest_sim_packet_t* queued = picoquictest_sim_link_create_packet();
+
+            if (qid > test_ctx->nb_scenarios || test_ctx->record[qid].query_received || queued == NULL) {
+                ret = -1;
+            }
+            else {
+                test_ctx->record[qid].query_arrival_time = test_ctx->simulated_time + test_ctx->scenario[qid].response_delay;
+                test_ctx->record[qid].query_received = 1;
+                *is_active = 1;
+
+                /* queue the response */
+                if (test_ctx->scenario[qid].is_success &&
+                    quicdog_test_get_format_response(packet->bytes, packet->length,
+                        queued->bytes, PICOQUIC_MAX_PACKET_SIZE, &queued->length) == 0) {
+                    test_ctx->record[qid].queued_packet = queued;
+                    quicdoq_set_test_response_queue(test_ctx, qid);
+                }
+            }
+
+            if (ret != 0 && queued != NULL) {
+                free(queued);
+            }
+        }
+
+        free(packet);
+    }
+
+    return ret;
+}
+
+int quicdoq_test_server_sim_udp_response(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
+{
+    int ret = 0;
+
+    /* Check whether the next query is ready */
+    if (test_ctx->next_response_id >= test_ctx->nb_scenarios ||
+        test_ctx->record[test_ctx->next_response_id].queued_packet == NULL) {
+        ret = -1;
+    }
+    else {
+        /* submit the response */
+        picoquictest_sim_packet_t* packet = test_ctx->record[test_ctx->next_response_id].queued_packet;
+        if (packet->length > 0) {
+            *is_active = 1;
+            picoquic_store_addr(&packet->addr_from, (struct sockaddr*) & test_ctx->udp_ctx->udp_addr);
+            picoquic_store_addr(&packet->addr_to, (struct sockaddr*) & test_ctx->server_addr);
+            picoquictest_sim_link_submit(link, packet, test_ctx->simulated_time);
+        }
+        else {
+            /* Just drop the response */
+            free(packet);
+        }
+        test_ctx->record[test_ctx->next_response_id].queued_packet = NULL;
+        test_ctx->record[test_ctx->next_response_id].response_sent_time = test_ctx->simulated_time;
+    }
+
+    quicdoq_reset_test_response_queue(test_ctx);
+
+    return ret;
+}
+
 int quicdoq_test_sim_step(quicdog_test_ctx_t* test_ctx, int * is_active)
 {
     int ret = 0;
@@ -584,6 +768,25 @@ int quicdoq_test_sim_step(quicdog_test_ctx_t* test_ctx, int * is_active)
         next_step = 5;
     }
 
+    if (test_ctx->udp_ctx != NULL) {
+        if (test_ctx->udp_ctx->next_wake_time < next_time) {
+            next_time = test_ctx->udp_ctx->next_wake_time;
+            next_step = 6;
+        }
+
+        if (test_ctx->udp_link_in->first_packet != NULL &&
+            test_ctx->udp_link_in->first_packet->arrival_time < next_time) {
+            next_time = test_ctx->udp_link_in->first_packet->arrival_time;
+            next_step = 7;
+        }
+
+        if (test_ctx->udp_link_out->first_packet != NULL &&
+            test_ctx->udp_link_out->first_packet->arrival_time < next_time) {
+            next_time = test_ctx->udp_link_out->first_packet->arrival_time;
+            next_step = 8;
+        }
+    }
+
     /* Update the virtual time */
     if (next_time > test_ctx->simulated_time) {
         test_ctx->simulated_time = next_time;
@@ -607,9 +810,26 @@ int quicdoq_test_sim_step(quicdog_test_ctx_t* test_ctx, int * is_active)
         ret = quicdoq_test_client_submit_query(test_ctx);
         break;
     case 5:
-        ret = quicdoq_test_server_submit_response(test_ctx);
+        if (test_ctx->udp_ctx == NULL) {
+            ret = quicdoq_test_server_submit_response(test_ctx);
+        }
+        else {
+            /* if testing UDP, simulate remote UDP server */
+            ret = quicdoq_test_server_sim_udp_response(test_ctx, test_ctx->udp_link_in, is_active);
+        }
         break;
-    /* TODO: per scenario actions */
+    case 6:
+        /* Prepare UDP output */
+        ret = quicdoq_test_udp_packet_prepare(test_ctx, test_ctx->udp_link_out, is_active);
+        break;
+    case 7:
+        /* Prepare arrival on udp_link_in */
+        ret = quicdoq_test_sim_udp_input(test_ctx, test_ctx->udp_link_in, is_active);
+        break;
+    case 8:
+        /* Prepare arrival on udp_link_out */
+        ret = quicdoq_test_sim_udp_output(test_ctx, test_ctx->udp_link_out, is_active);
+        break;
     default:
         /* Nothing to do, which is unlikely since the server is always up. */
         ret = -1;
@@ -644,16 +864,16 @@ static quicdoq_test_scenario_entry_t const basic_scenario[] = {
     { 0, 0, 1 }
 };
 
-int quicdoq_basic_test()
+int quicdoq_test_scenario(quicdoq_test_scenario_entry_t const* scenario, size_t size_of_scenario, int test_udp, uint64_t time_limit)
 {
-    quicdog_test_ctx_t* test_ctx = quicdoq_test_ctx_create(basic_scenario, sizeof(basic_scenario));
+    quicdog_test_ctx_t* test_ctx = quicdoq_test_ctx_create(scenario, size_of_scenario, test_udp);
     int ret = 0;
 
     if (test_ctx == NULL) {
         ret = -1;
     }
     else {
-        ret = quicdoq_test_sim_run(test_ctx, 3000000);
+        ret = quicdoq_test_sim_run(test_ctx, time_limit);
 
         if (ret != 0 || !test_ctx->all_query_served) {
             DBG_PRINTF("Fail after %llu, all_served=%d, ret=%d",
@@ -664,4 +884,14 @@ int quicdoq_basic_test()
     }
 
     return ret;
+}
+
+int quicdoq_basic_test()
+{
+    return quicdoq_test_scenario(basic_scenario, sizeof(basic_scenario), 0, 3000000);
+}
+
+int quicdoq_basic_udp_test()
+{
+    return quicdoq_test_scenario(basic_scenario, sizeof(basic_scenario), 1, 3000000);
 }

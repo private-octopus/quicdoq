@@ -234,7 +234,6 @@ uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* n
             }
             else {
                 *part_data = (uint8_t)(data - part_data - 1);
-                part_data = data;
             }
         }
     }

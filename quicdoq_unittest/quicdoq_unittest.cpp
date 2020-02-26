@@ -44,5 +44,12 @@ namespace quicdoqunittest
 
 			Assert::AreEqual(ret, 0);
 		}
+
+		TEST_METHOD(basic_udp)
+		{
+			int ret = quicdoq_basic_udp_test();
+
+			Assert::AreEqual(ret, 0);
+		}
 	};
 }

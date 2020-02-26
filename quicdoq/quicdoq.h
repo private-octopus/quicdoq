@@ -118,7 +118,9 @@ extern "C" {
 
 /* DoQ error codes */
 #define QUICDOQ_ERROR_INTERNAL 0x201
-
+#define QUICDOQ_ERROR_RESPONSE_TOO_LONG 0x202
+#define QUICDOQ_ERROR_RESPONSE_TIME_OUT 0x203
+#define QUICDOQ_ERROR_QUERY_TOO_LONG 0x204
 
 /* Doq client return codes
  */
@@ -151,7 +153,7 @@ extern "C" {
         uint16_t query_length; /* length of the query */
         uint8_t* response; /* buffer holding the response */
         uint16_t response_max_size; /* size of the response buffer */
-        uint16_t response_length; /* size of the actual response */
+        size_t response_length; /* size of the actual response */
         quicdoq_app_cb_fn client_cb; /* Callback function for this query */
         void* client_cb_ctx; /* callback context for this query */
         quicdoq_query_return_enum return_code;
@@ -189,7 +191,7 @@ extern "C" {
 
     int quicdoq_post_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
-    int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
+    int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code);
 
     /* Utility functions for formatting DNS messages */
 

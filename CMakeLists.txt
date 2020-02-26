@@ -14,6 +14,7 @@ endif()
 set(QUICDOQ_LIBRARY_FILES
     quicdoq/quicdoq.c
     quicdoq/quicdoq_util.c
+    quicdoq/udp_relay.c
 )
 
 set(QUICDOQ_TEST_LIBRARY_FILES
