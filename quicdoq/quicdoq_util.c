@@ -489,6 +489,7 @@ size_t quicdoq_parse_dns_RR(uint8_t* packet, size_t length, size_t start,
             text = quicdoq_add_string(text, text_max, ": \"", 3);
             text = quicdoq_add_hex(text, text_max, packet + start, ldata);
             text = quicdoq_add_string(text, text_max, "\"}", 2);
+            start += ldata;
         }
     }
 
@@ -559,6 +560,8 @@ size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
         uint16_t qclass = 0;
         uint16_t xrcount[3];
         char const* xrname[3] = { "answerRRs", "authorityRRs", "additionalRRs" };
+
+        *text = 0;
 
         xrcount[0] = ancount;
         xrcount[1] = nscount;
@@ -641,4 +644,129 @@ size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
     }
 
     return start;
+}
+
+/* Get RR Code from RR Name
+ */
+
+const quicdoq_rr_entry_t rr_table[] = {
+    { "A", 1},
+    { "NS", 2},
+    { "MD", 3},
+    { "MF", 4},
+    { "CNAME", 5},
+    { "SOA", 6},
+    { "MB", 7},
+    { "MG", 8},
+    { "MR", 9},
+    { "NULL", 10},
+    { "WKS", 11},
+    { "PTR", 12},
+    { "HINFO", 13},
+    { "MINFO", 14},
+    { "MX", 15},
+    { "TXT", 16},
+    { "RP", 17},
+    { "AFSDB", 18},
+    { "X25", 19},
+    { "ISDN", 20},
+    { "RT", 21},
+    { "NSAP", 22},
+    { "NSAP-PTR", 23},
+    { "SIG", 24},
+    { "KEY", 25},
+    { "PX", 26},
+    { "GPOS", 27},
+    { "AAAA", 28},
+    { "LOC", 29},
+    { "NXT", 30},
+    { "EID", 31},
+    { "NIMLOC", 32},
+    { "SRV", 33},
+    { "ATMA", 34},
+    { "NAPTR", 35},
+    { "KX", 36},
+    { "CERT", 37},
+    { "A6", 38},
+    { "DNAME", 39},
+    { "SINK", 40},
+    { "OPT", 41},
+    { "APL", 42},
+    { "DS", 43},
+    { "SSHFP", 44},
+    { "IPSECKEY", 45},
+    { "RRSIG", 46},
+    { "NSEC", 47},
+    { "DNSKEY", 48},
+    { "DHCID", 49},
+    { "NSEC3", 50},
+    { "NSEC3PARAM", 51},
+    { "TLSA", 52},
+    { "SMIMEA", 53},
+    { "Unassigned", 54},
+    { "HIP", 55},
+    { "NINFO", 56},
+    { "RKEY", 57},
+    { "TALINK", 58},
+    { "CDS", 59},
+    { "CDNSKEY", 60},
+    { "OPENPGPKEY", 61},
+    { "CSYNC", 62},
+    { "ZONEMD", 63},
+    { "SPF", 99},
+    { "UINFO", 100},
+    { "UID", 101},
+    { "GID", 102},
+    { "UNSPEC", 103},
+    { "NID", 104},
+    { "L32", 105},
+    { "L64", 106},
+    { "LP", 107},
+    { "EUI48", 108},
+    { "EUI64", 109},
+    { "TKEY", 249},
+    { "TSIG", 250},
+    { "IXFR", 251},
+    { "AXFR", 252},
+    { "MAILB", 253},
+    { "MAILA", 254},
+    { "*", 255},
+    { "URI", 256},
+    { "CAA", 257},
+    { "AVC", 258},
+    { "DOA", 259},
+    { "AMTRELAY", 260},
+    { "TA", 32768},
+    { "DLV", 32769} };
+
+const size_t nb_rr_table = sizeof(rr_table) / sizeof(quicdoq_rr_entry_t);
+
+uint16_t quicdoq_get_rr_type(char const* rr_name) {
+    size_t x;
+    uint16_t rr_type = 0;
+
+    for (x = 0; x < nb_rr_table; x++) {
+        if (strcmp(rr_name, rr_table[x].rr_name) == 0) {
+            rr_type = rr_table[x].rr_type;
+            break;
+        }
+    }
+
+    if (rr_type == 0) {
+        for (int i = 0; 1; i++) {
+            int c = rr_name[i];
+
+            if (c == 0) {
+                break;
+            } else if (c >= '0' && c <= '9') {
+                rr_type = 10 * rr_type + (uint16_t)(c - '0');
+            }
+            else {
+                rr_type = UINT16_MAX;
+                break;
+            }
+        }
+    }
+
+    return rr_type;
 }

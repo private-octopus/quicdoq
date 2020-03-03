@@ -486,12 +486,12 @@ quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const 
         }
 
         /* create the client and server contexts */
-        test_ctx->qd_server = quicdoq_create(quicdoq_test_client_cb, (void*)test_ctx,
-            test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL,
+        test_ctx->qd_server = quicdoq_create(
+            test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL, NULL, NULL,
             quicdoq_test_server_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
-        test_ctx->qd_client = quicdoq_create(quicdoq_test_server_cb, (void*)test_ctx,
-            NULL, NULL, test_ctx->test_server_cert_store_file,
+        test_ctx->qd_client = quicdoq_create(
+            NULL, NULL, test_ctx->test_server_cert_store_file, NULL, NULL,
             quicdoq_test_client_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
 
@@ -597,6 +597,7 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, quicdoq_ctx_t*
 int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
 {
     int ret = 0;
+    int if_index = 0;
     picoquictest_sim_packet_t* packet = picoquictest_sim_link_create_packet();
 
     if (packet == NULL) {
@@ -605,14 +606,15 @@ int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_s
     }
     else {
         /* check whether there is something to send */
+        int length_to;
+        int length_from;
         quicdoq_udp_prepare_next_packet(test_ctx->udp_ctx, test_ctx->simulated_time,
-            packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length);
+            packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length,
+            &packet->addr_to, &length_to, &packet->addr_from, &length_from, &if_index);
     }
 
     if (ret == 0 && packet->length > 0) {
         *is_active = 1;
-        picoquic_store_addr(&packet->addr_to, (struct sockaddr *)&test_ctx->udp_ctx->udp_addr);
-        picoquic_store_addr(&packet->addr_from, (struct sockaddr*) & test_ctx->server_addr);
         picoquictest_sim_link_submit(link, packet, test_ctx->simulated_time);
     }
     else {
@@ -633,7 +635,8 @@ int quicdoq_test_sim_udp_input(quicdog_test_ctx_t* test_ctx, picoquictest_sim_li
     }
     else {
         *is_active = 1;
-        quicdoq_udp_incoming_packet(test_ctx->udp_ctx, packet->bytes, (uint32_t)packet->length, test_ctx->simulated_time);
+        quicdoq_udp_incoming_packet(test_ctx->udp_ctx, packet->bytes, (uint32_t)packet->length, 
+            (struct sockaddr*)&packet->addr_to, 0, test_ctx->simulated_time);
         free(packet);
     }
 

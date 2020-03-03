@@ -163,6 +163,7 @@ int quicdoq_udp_callback(
                  * update the sending time. */
                 memset(quq_ctx, 0, sizeof(quicdog_udp_queued_t));
                 quq_ctx->query_ctx = query_ctx;
+                quq_ctx->query_arrival_time = current_time;
                 quq_ctx->next_send_time = current_time;
                 quq_ctx->udp_query_id = udp_ctx->next_id++;
 
@@ -185,7 +186,8 @@ int quicdoq_udp_callback(
 }
 
 void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
-    uint64_t current_time, uint8_t* send_buffer, size_t send_buffer_max, size_t* send_length)
+    uint64_t current_time, uint8_t* send_buffer, size_t send_buffer_max, size_t* send_length,
+    struct sockaddr_storage* p_addr_to, int* to_len, struct sockaddr_storage* p_addr_from, int* from_len, int* if_index)
 {
     quicdog_udp_queued_t* quq_ctx = udp_ctx->first_query;
 
@@ -196,14 +198,16 @@ void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
         udp_ctx->next_wake_time = UINT64_MAX;
     }
     else if (quq_ctx->next_send_time > current_time) {
-
+        /* Do nothing */
     } else {
         if (quq_ctx->nb_sent > QUICDOQ_UDP_MAX_REPEAT) {
             /* Query failed. Delete, report failure */
+            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: Cancel after max repeat, udp query #%d.\n", quq_ctx->udp_query_id);
             (void)quicdoq_udp_cancel_query(udp_ctx, quq_ctx, QUICDOQ_ERROR_RESPONSE_TIME_OUT);
         }
         else if (quq_ctx->query_ctx->query_length > send_buffer_max) {
             /* Cannot be sent. Delete, send back a query too long failure */
+            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: Response too long, udp query #%d.\n", quq_ctx->udp_query_id);
             (void)quicdoq_udp_cancel_query(udp_ctx, quq_ctx, QUICDOQ_ERROR_QUERY_TOO_LONG);
         }
         else {
@@ -213,8 +217,15 @@ void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
             *send_length = quq_ctx->query_ctx->query_length;
 
             quq_ctx->nb_sent++;
-            quq_ctx->next_send_time = current_time + (udp_ctx->rto << quq_ctx->nb_sent);
+            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: preparing UDP query #%d after %"PRIu64 "us.\n", 
+                quq_ctx->udp_query_id, current_time - quq_ctx->query_arrival_time);
+            quq_ctx->next_send_time = current_time + udp_ctx->rto;
             quicdoq_udp_reinsert_in_list(udp_ctx, quq_ctx);
+            *to_len = picoquic_store_addr(p_addr_to, (struct sockaddr*)&udp_ctx->udp_addr);
+            *from_len = picoquic_store_addr(p_addr_from, (struct sockaddr*) & udp_ctx->local_addr);
+            if (udp_ctx->if_index >= 0) {
+                *if_index = udp_ctx->if_index;
+            }
         }
     }
 }
@@ -223,6 +234,8 @@ void quicdoq_udp_incoming_packet(
     quicdoq_udp_ctx_t* udp_ctx,
     uint8_t* bytes,
     size_t length,
+    struct sockaddr* addr_to,
+    int if_index_to,
     uint64_t current_time)
 {
     if (length < 2) {
@@ -237,16 +250,23 @@ void quicdoq_udp_incoming_packet(
         }
         else if (length > quq_ctx->query_ctx->response_max_size) {
             /* Reponse is too long */
+            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: incoming UDP response too long, query  #%d.\n", quq_ctx->udp_query_id);
             (void)quicdoq_udp_cancel_query(udp_ctx, quq_ctx, QUICDOQ_ERROR_RESPONSE_TOO_LONG);
         }
         else
         {
+            /* Update the local address */
+            picoquic_store_addr(&udp_ctx->local_addr, addr_to);
+            udp_ctx->if_index = if_index_to;
+
             /* Store the response */
             quq_ctx->query_ctx->response[0] = quq_ctx->query_ctx->query[0];
             quq_ctx->query_ctx->response[1] = quq_ctx->query_ctx->query[1];
             memcpy(quq_ctx->query_ctx->response + 2, bytes + 2, length - 2);
             quq_ctx->query_ctx->response_length = length;
             /* Post to the quicdoq server */
+            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: incoming UDP to query #%d after %"PRIu64 "us. Posted to Quicdoq server.\n", 
+                quq_ctx->udp_query_id, current_time - quq_ctx->query_arrival_time);
             (void)quicdoq_post_response(udp_ctx->quicdoq_ctx, quq_ctx->query_ctx);
             /* Remove the context from the list and delete it */
             quicdoq_udp_remove_from_list(udp_ctx, quq_ctx);
@@ -262,14 +282,21 @@ void quicdoq_udp_incoming_packet(
     }
 }
 
+uint64_t quicdoq_next_udp_time(quicdoq_udp_ctx_t* udp_ctx)
+{
+    return udp_ctx->next_wake_time;
+}
+
 quicdoq_udp_ctx_t* quicdoq_create_udp_ctx(quicdoq_ctx_t* quicdoq_ctx, struct sockaddr* addr)
 {
     quicdoq_udp_ctx_t* udp_ctx = (quicdoq_udp_ctx_t*)malloc(sizeof(quicdoq_udp_ctx_t));
     if (udp_ctx != NULL) {
         memset(udp_ctx, 0, sizeof(quicdoq_udp_ctx_t));
         picoquic_store_addr(&udp_ctx->udp_addr, addr);
+        udp_ctx->quicdoq_ctx = quicdoq_ctx;
         udp_ctx->next_wake_time = UINT64_MAX;
         udp_ctx->rto = QUICDOQ_UDP_DEFAULT_RTO;
+        udp_ctx->if_index = -1;
     }
     return udp_ctx;
 }

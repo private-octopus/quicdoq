@@ -38,6 +38,13 @@ namespace quicdoqunittest
 			Assert::AreEqual(ret, 0);
 		}
 
+		TEST_METHOD(rr_name_parse)
+		{
+			int ret = rr_name_parse_test();
+
+			Assert::AreEqual(ret, 0);
+		}
+
 		TEST_METHOD(basic)
 		{
 			int ret = quicdoq_basic_test();
