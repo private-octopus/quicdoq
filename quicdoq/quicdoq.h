@@ -135,6 +135,7 @@ extern "C" {
     /* Definition of the callback function
      */
     typedef struct st_quicdoq_query_ctx_t quicdoq_query_ctx_t;
+    typedef struct st_quicdoq_cnx_ctx_t quicdoq_cnx_ctx_t;
 
     typedef int (*quicdoq_app_cb_fn)(
         quicdoq_query_return_enum callback_code,
@@ -145,8 +146,10 @@ extern "C" {
     /* Definition of the query context */
     typedef struct st_quicdoq_query_ctx_t {
         char const* server_name; /* Server SNI in outgoing query, client SNI in incoming query */
-        struct sockaddr* server_addr; /* Address for the server connection */
-        struct sockaddr* client_addr; /* Address for the server connection */
+        struct sockaddr* server_addr; /* Address of the target server */
+        struct sockaddr* client_addr; /* Address of the client if known connection */
+        picoquic_quic_t* quic; /* Quic context for logging */
+        picoquic_connection_id_t cid;
         uint16_t query_id; /* Unique ID of the query, assigned by the client */
         uint8_t* query; /* buffer holding the query */
         uint16_t query_max_size; /* length of the query */
@@ -159,20 +162,19 @@ extern "C" {
         quicdoq_query_return_enum return_code;
     } quicdoq_query_ctx_t;
 
-    quicdoq_query_ctx_t* quicdoq_create_query_ctx(uint16_t query_length, uint16_t response_max_size);
-
-    void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx);
-
     /* Connection context management functions.
      * The type quicdoq_ctx_t is treated here as an opaque pointer, to
      * provide isolation between the app and the stack.
      */
     typedef struct st_quicdoq_ctx_t quicdoq_ctx_t;
-    quicdoq_ctx_t* quicdoq_create(quicdoq_app_cb_fn server_cb, void* server_callback_ctx,
+    quicdoq_ctx_t* quicdoq_create(
         char const* cert_file_name, char const* key_file_name, char const* cert_root_file_name,
+        char* ticket_store_file_name, char* token_store_file_name,
         quicdoq_app_cb_fn app_cb_fn, void * app_cb_ctx,
         uint64_t* simulated_time);
     void quicdoq_delete(quicdoq_ctx_t* ctx);
+    void quicdoq_set_callback(quicdoq_ctx_t* ctx, quicdoq_app_cb_fn app_cb_fn, void* app_cb_ctx);
+    picoquic_quic_t* quicdoq_get_quic_ctx(quicdoq_ctx_t* ctx);
 
     /* Query context management functions 
      * Client side:
@@ -185,24 +187,49 @@ extern "C" {
      *  - quicdoq_cancel_response(): terminate an incoming query without a response.
      */
 
+
+    quicdoq_query_ctx_t* quicdoq_create_query_ctx(uint16_t query_length, uint16_t response_max_size);
+
+    void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx);
+
     int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
     int quicdoq_cancel_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
-    int quicdoq_post_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
+    int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx);
 
     int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code);
 
     /* Utility functions for formatting DNS messages */
+    typedef struct st_quicdoq_rr_entry_t {
+        char const* rr_name;
+        uint16_t rr_type;
+    } quicdoq_rr_entry_t;
 
     uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* name);
     uint8_t* quicdog_format_dns_query(uint8_t* data, uint8_t* data_max, char const* qname,
         uint16_t id, uint16_t qclass, uint16_t qtype, uint16_t l_max);
-    size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
+    size_t quicdoq_parse_dns_name(const uint8_t* packet, size_t length, size_t start,
         uint8_t** text_start, uint8_t* text_max);
-    size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start);
-    size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
+    size_t quicdoq_skip_dns_name(const uint8_t* packet, size_t length, size_t start);
+    size_t quicdoq_parse_dns_query(const uint8_t* packet, size_t length, size_t start,
         uint8_t** text_start, uint8_t* text_max);
+
+    uint16_t quicdoq_get_rr_type(char const* rr_name);
+
+    /* Handling of UDP callbacks */
+    typedef struct st_quicdoq_udp_ctx_t quicdoq_udp_ctx_t;
+
+    quicdoq_udp_ctx_t* quicdoq_create_udp_ctx(quicdoq_ctx_t* quicdoq_ctx, struct sockaddr* addr);
+    void quicdoq_delete_udp_ctx(quicdoq_udp_ctx_t* udp_ctx);
+    int quicdoq_udp_callback(quicdoq_query_return_enum callback_code, void* callback_ctx,
+        quicdoq_query_ctx_t* query_ctx, uint64_t current_time);
+    void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
+        uint64_t current_time, uint8_t* send_buffer, size_t send_buffer_max, size_t* send_length,
+        struct sockaddr_storage* p_addr_to, int* to_len, struct sockaddr_storage* p_addr_from, int* from_len, int* if_index);
+    void quicdoq_udp_incoming_packet(quicdoq_udp_ctx_t* udp_ctx, uint8_t* bytes, size_t length, 
+        struct sockaddr* addr_to, int if_index_to, uint64_t current_time);
+    uint64_t quicdoq_next_udp_time(quicdoq_udp_ctx_t* udp_ctx);
 
 #ifdef __cplusplus
 }

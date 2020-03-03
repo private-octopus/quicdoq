@@ -133,7 +133,43 @@ static char const* dnscode_test_query0_json =
 \"TYPE\":41, \"CLASS\":2048, \"TTL\":0,\n\
 \"RDATAHEX\": \"\"}]}";
 
-int dns_query_parse_test()
+static uint8_t dnscode_test_response0[] = {
+    0x00, 0x00, 0x80, 0x80, 0x00, 0x01, 0x00, 0x01,
+    0x00, 0x00, 0x00, 0x00, 0x07, 0x65, 0x78, 0x61,
+    0x6d, 0x70, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d,
+    0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00,
+    0x01, 0x00, 0x01, 0x00, 0x00, 0x2c, 0x55, 0x00,
+    0x04, 0x5d, 0xb8, 0xd8, 0x22 };
+
+static const char* dnscode_test_response0_json = 
+"{ \"ID\":0, \"QR\":1, \"Opcode\":0, \"AA\":0,\n\
+\"TC\":0, \"RD\":0, \"RA\":1, \"AD\":0, \"CD\":0, \"RCODE\":0,\n\
+\"QDCOUNT\":1, \"ANCOUNT\":1, \"NSCOUNT\":0, \"ARCOUNT\":0,\n\
+\"QNAME\": \"example.com.\", \"QTYPE\":1, \"QCLASS\":1,\n\
+\"answerRRs\": [\n\
+{ \"NAME\": \"example.com.\",\n\"TYPE\":1, \"CLASS\":1, \"TTL\":11349,\n\"RDATAHEX\": \"5DB8D822\"}]}";
+
+
+static uint8_t dnscode_test_response1[] = {
+    0x00, 0x00, 0x80, 0x80, 0x00, 0x01, 0x00, 0x01,
+    0x00, 0x00, 0x00, 0x01, 0x07, 0x65, 0x78, 0x61,
+    0x6d, 0x70, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d,
+    0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00,
+    0x01, 0x00, 0x01, 0x00, 0x00, 0x2c, 0x55, 0x00,
+    0x04, 0x5d, 0xb8, 0xd8, 0x22, 0x00, 0x00, 0x29,
+    0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+static const char* dnscode_test_response1_json =
+"{ \"ID\":0, \"QR\":1, \"Opcode\":0, \"AA\":0,\n\
+\"TC\":0, \"RD\":0, \"RA\":1, \"AD\":0, \"CD\":0, \"RCODE\":0,\n\
+\"QDCOUNT\":1, \"ANCOUNT\":1, \"NSCOUNT\":0, \"ARCOUNT\":1,\n\
+\"QNAME\": \"example.com.\", \"QTYPE\":1, \"QCLASS\":1,\n\
+\"answerRRs\": [\n\
+{ \"NAME\": \"example.com.\",\n\"TYPE\":1, \"CLASS\":1, \"TTL\":11349,\n\"RDATAHEX\": \"5DB8D822\"}],\n\
+\"additionalRRs\": [\n\
+{ \"NAME\": \".\",\n\"TYPE\":41, \"CLASS\":512, \"TTL\":0,\n\"RDATAHEX\": \"\"}]}";
+
+int dns_query_parse_test_one(const uint8_t * query, size_t query_size, char const * query_json)
 {
     int ret = 0;
     char query_out[1024];
@@ -141,7 +177,7 @@ int dns_query_parse_test()
     size_t next = 0;
     uint8_t* query_x = (uint8_t*)query_out;
 
-    next = quicdoq_parse_dns_query(dnscode_test_query0, sizeof(dnscode_test_query0), 0, &query_x,
+    next = quicdoq_parse_dns_query(query, query_size, 0, &query_x,
         (uint8_t*)query_out + sizeof(query_out));
     if (query_x == NULL) {
         ret = -1;
@@ -150,15 +186,30 @@ int dns_query_parse_test()
         query_length = query_x - (uint8_t*)query_out;
         *query_x = 0;
 
-        if (next != sizeof(dnscode_test_query0)) {
+        if (next != query_size) {
             ret = -1;
         }
-        else if (strlen(dnscode_test_query0_json) != query_length) {
+        else if (strlen(query_json) != query_length) {
             ret = -1;
         }
-        else if (memcmp(dnscode_test_query0_json, query_out, query_length) != 0) {
+        else if (memcmp(query_json, query_out, query_length) != 0) {
             ret = -1;
         }
+    }
+
+    return ret;
+}
+
+int dns_query_parse_test()
+{
+    int ret = dns_query_parse_test_one(dnscode_test_query0, sizeof(dnscode_test_query0), dnscode_test_query0_json);
+
+    if (ret == 0) {
+        ret = dns_query_parse_test_one(dnscode_test_response0, sizeof(dnscode_test_response0), dnscode_test_response0_json);
+    }
+
+    if (ret == 0) {
+        ret = dns_query_parse_test_one(dnscode_test_response1, sizeof(dnscode_test_response1), dnscode_test_response1_json);
     }
 
     return ret;
@@ -183,6 +234,51 @@ int dns_query_format_test()
             ret = -1;
         }
         else if (memcmp(dnscode_test_query0, dns_query, query_length) != 0) {
+            ret = -1;
+        }
+    }
+
+    return ret;
+}
+
+/* Test the RR Type entry */
+
+extern const quicdoq_rr_entry_t rr_table[];
+extern const size_t nb_rr_table;
+
+int rr_name_parse_test()
+{
+    int ret = 0;
+    char rr_type_buf[256];
+    const uint16_t rr_num[] = { 0, 1, 17, 0xFFFE };
+    size_t nb_rr_num = sizeof(rr_num) / sizeof(uint16_t);
+    const char* rr_bad[] = { "123x", "x--y" };
+    size_t nb_rr_bad = sizeof(rr_bad) / sizeof(const char*);
+    uint16_t rr_type;
+
+    for (size_t i = 0; ret == 0 && i < nb_rr_table; i++) {
+        memcpy(rr_type_buf, rr_table[i].rr_name, strlen(rr_table[i].rr_name) + 1);
+        rr_type = quicdoq_get_rr_type(rr_type_buf);
+        if (rr_type != rr_table[i].rr_type) {
+            DBG_PRINTF("For %s expected %d, got %d", rr_type_buf, rr_table[i].rr_type, rr_type);
+            ret = -1;
+        }
+    }
+
+    for (size_t i = 0; ret == 0 && i < nb_rr_num; i++) {
+        size_t str_len;
+        (void)picoquic_sprintf(rr_type_buf, sizeof(rr_type_buf), &str_len, "%d", rr_num[i]);
+        rr_type = quicdoq_get_rr_type(rr_type_buf);
+        if (rr_type != rr_num[i]) {
+            DBG_PRINTF("For %s expected %d, got %d", rr_type_buf, rr_num[i], rr_type);
+            ret = -1;
+        }
+    }
+
+    for (size_t i = 0; ret == 0 && i < nb_rr_bad; i++) {
+        rr_type = quicdoq_get_rr_type(rr_bad[i]);
+        if (rr_type != UINT16_MAX) {
+            DBG_PRINTF("For %s expected %d, got %d", rr_bad[i], UINT16_MAX, rr_type);
             ret = -1;
         }
     }

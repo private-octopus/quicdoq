@@ -100,14 +100,18 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
             /* Incoming data, server size, requires a context creation */
             stream_ctx = quicdoq_find_or_create_stream(stream_id, cnx_ctx, 1);
             if (stream_ctx == NULL) {
+                picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                 DBG_PRINTF("Cannot create server context for server stream  #%llu", (unsigned long long)stream_id);
+                picoquic_log_app_message(picoquic_get_quic_ctx(cnx), &cid, "Quicdoq: Cannot create server context for server stream  #%llu.\n", (unsigned long long)stream_id);
                 ret = -1;
             }
             else {
                 /* If this is a server stream, allocate a query structure */
                 stream_ctx->query_ctx = quicdoq_create_query_ctx(1024, 4096);
                 if (stream_ctx->query_ctx == NULL) {
+                    picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                     DBG_PRINTF("Cannot create query context for server stream  #%llu", (unsigned long long)stream_id);
+                    picoquic_log_app_message(picoquic_get_quic_ctx(cnx), &cid, "Quicdoq: Cannot create query context for server stream  #%llu\n", (unsigned long long)stream_id);
                     quicdoq_delete_stream_ctx(cnx_ctx, stream_ctx);
                     ret = -1;
                 }
@@ -116,6 +120,8 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
                      * ned to associate responses with the stream context 
                      * TODO: check what happens if the server connection disappears. */
                     stream_ctx->query_ctx->client_cb_ctx = stream_ctx;
+                    stream_ctx->query_ctx->quic = picoquic_get_quic_ctx(cnx);
+                    stream_ctx->query_ctx->cid = picoquic_get_logging_cnxid(cnx);
                 }
             }
         }
@@ -123,6 +129,7 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
         if (ret == 0) {
             if (stream_ctx->query_ctx->query_length + length > stream_ctx->query_ctx->query_max_size){
                 DBG_PRINTF("Incoming query too long for server stream  #%llu", (unsigned long long)stream_id);
+                picoquic_log_app_message(stream_ctx->query_ctx->quic, &stream_ctx->query_ctx->cid, "Quicdoq: Incoming query too long for server stream  #%llu.\n", (unsigned long long)stream_id);
                 ret = -1;
             }
             else {
@@ -142,12 +149,15 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
     }
     else {
         if (stream_ctx == NULL) {
+            picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
             DBG_PRINTF("Data arrived on client stream  #%llu before context creation", (unsigned long long)stream_id);
+            picoquic_log_app_message(picoquic_get_quic_ctx(cnx), &cid, "Quicdoq: Data arrived on client stream  #%llu before context creation.\n", (unsigned long long)stream_id);
             ret = -1;
         }
         else {
             if (stream_ctx->query_ctx->response_length + length > stream_ctx->query_ctx->response_max_size) {
                 DBG_PRINTF("Incoming response too long for client stream  #%llu", (unsigned long long)stream_id);
+                picoquic_log_app_message(stream_ctx->query_ctx->quic, &stream_ctx->query_ctx->cid, "Quicdoq: Incoming response too long for client stream  #%llu.\n", (unsigned long long)stream_id);
                 ret = -1;
             }
             else {
@@ -179,6 +189,10 @@ int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, qu
     int ret = 0;
     uint8_t* data;
     size_t data_length;
+#ifdef _WINDOWS
+    UNREFERENCED_PARAMETER(stream_id);
+    UNREFERENCED_PARAMETER(cnx);
+#endif
 
     if (cnx_ctx->is_server) {
         data = stream_ctx->query_ctx->response;
@@ -291,15 +305,28 @@ void quicdoq_callback_delete_context(quicdoq_cnx_ctx_t* cnx_ctx)
 quicdoq_cnx_ctx_t* quicdoq_find_cnx_ctx(quicdoq_ctx_t* quicdoq_ctx, char const* sni, struct sockaddr* addr)
 {
     quicdoq_cnx_ctx_t* cnx_ctx = quicdoq_ctx->first_cnx;
-    size_t l_sni = strlen(sni);
 
-    while (cnx_ctx != NULL) {
-        if (!cnx_ctx->is_server &&
-            picoquic_compare_addr(addr, (struct sockaddr*) & cnx_ctx->addr) == 0 &&
-            cnx_ctx->sni != NULL && strlen(cnx_ctx->sni) == l_sni &&
-            memcmp(sni, cnx_ctx->sni, l_sni) == 0) {
-            /* TODO: manage connection life time */
-            break;
+    if (sni != NULL) {
+        size_t l_sni = strlen(sni);
+
+        while (cnx_ctx != NULL) {
+            if (!cnx_ctx->is_server &&
+                picoquic_compare_addr(addr, (struct sockaddr*) & cnx_ctx->addr) == 0 &&
+                cnx_ctx->sni != NULL && strlen(cnx_ctx->sni) == l_sni &&
+                memcmp(sni, cnx_ctx->sni, l_sni) == 0) {
+                /* TODO: manage connection life time */
+                break;
+            }
+        }
+    }
+    else {
+        while (cnx_ctx != NULL) {
+            if (!cnx_ctx->is_server &&
+                picoquic_compare_addr(addr, (struct sockaddr*) & cnx_ctx->addr) == 0 &&
+                cnx_ctx->sni == NULL) {
+                /* TODO: manage connection life time */
+                break;
+            }
         }
     }
 
@@ -323,7 +350,9 @@ quicdoq_cnx_ctx_t* quicdoq_create_client_cnx(quicdoq_ctx_t* quicdoq_ctx, char co
             picoquic_set_callback(cnx, quicdoq_callback, cnx_ctx);
 
             if (picoquic_start_client_cnx(cnx) != 0) {
+                picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                 DBG_PRINTF("Could not start the connection to %s", sni);
+                picoquic_log_app_message(quicdoq_ctx->quic, &cid, "Quicdoq: Could not start the connection to %s.\n", (sni == NULL)?"<NULL>":sni);
                 /* TODO: proper error handling */
             }
         }
@@ -442,10 +471,10 @@ void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx)
 
 /* Create a quidoq node with the associated context
  */
-quicdoq_ctx_t * quicdoq_create(quicdoq_app_cb_fn server_cb, void* server_callback_ctx,
+quicdoq_ctx_t * quicdoq_create(
     char const * cert_file_name, char const * key_file_name, char const * cert_root_file_name,
-    quicdoq_app_cb_fn app_cb_fn, void* app_cb_ctx,
-    uint64_t * simulated_time)
+    char * ticket_store_file_name, char * token_store_file_name,
+    quicdoq_app_cb_fn app_cb_fn, void* app_cb_ctx, uint64_t * simulated_time)
 {
     quicdoq_ctx_t* quicdoq_ctx = (quicdoq_ctx_t*)malloc(sizeof(quicdoq_ctx_t));
     if (quicdoq_ctx != NULL) {
@@ -465,11 +494,29 @@ quicdoq_ctx_t * quicdoq_create(quicdoq_app_cb_fn server_cb, void* server_callbac
 
         quicdoq_ctx->quic = picoquic_create(64, cert_file_name, key_file_name, cert_root_file_name,
             QUICDOQ_ALPN, quicdoq_callback, &quicdoq_ctx->default_callback_ctx, NULL, NULL, NULL, current_time, simulated_time,
-            NULL, NULL, 0);
+            ticket_store_file_name, NULL, 0);
 
         if (quicdoq_ctx->quic == NULL) {
             quicdoq_delete(quicdoq_ctx);
             quicdoq_ctx = NULL;
+        }
+        else {
+            /* Load the tokens if present. */
+            if (token_store_file_name != NULL) {
+#if 0
+                /* TODO: load tokens API */
+                ret = picoquic_load_tokens(quicdoq_ctx->quic->p_first_token, current_time, token_file_name);
+
+                if (ret == PICOQUIC_ERROR_NO_SUCH_FILE) {
+                    DBG_PRINTF("Ticket file <%s> not created yet.\n", ticket_file_name);
+                    ret = 0;
+                }
+                else if (ret != 0) {
+                    DBG_PRINTF("Cannot load tickets from <%s>\n", ticket_file_name);
+                    ret = 0;
+                }
+#endif
+            }
         }
     }
 
@@ -492,6 +539,17 @@ void quicdoq_delete(quicdoq_ctx_t* ctx)
     free(ctx);
 }
 
+void quicdoq_set_callback(quicdoq_ctx_t* ctx, quicdoq_app_cb_fn app_cb_fn, void* app_cb_ctx)
+{
+    ctx->app_cb_fn = app_cb_fn;
+    ctx->app_cb_ctx = app_cb_ctx;
+}
+
+picoquic_quic_t* quicdoq_get_quic_ctx(quicdoq_ctx_t* ctx)
+{
+    return ctx->quic;
+}
+
 int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx)
 {
     int ret = 0;
@@ -503,6 +561,10 @@ int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ct
 
         if (cnx_ctx == NULL) {
             ret = -1;
+        }
+        else {
+            query_ctx->quic = quicdoq_ctx->quic;
+            query_ctx->cid = picoquic_get_logging_cnxid(cnx_ctx->cnx);
         }
     }
 
@@ -526,17 +588,25 @@ int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ct
 
 int quicdoq_cancel_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx)
 {
+    if (quicdoq_ctx == NULL || query_ctx == NULL) {
+        return -1;
+    }
     return 0;
 }
 
-int quicdoq_post_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx)
+int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx)
 {
     quicdoq_stream_ctx_t* stream_ctx = (quicdoq_stream_ctx_t*)query_ctx->client_cb_ctx;
     quicdoq_cnx_ctx_t* cnx_ctx = stream_ctx->cnx_ctx;
+    picoquic_log_app_message(query_ctx->quic, &query_ctx->cid, "Response #%d received at cnx time: %"PRIu64 "us.\n", query_ctx->query_id, 
+        picoquic_get_quic_time(query_ctx->quic) - picoquic_get_cnx_start_time(cnx_ctx->cnx));
     return picoquic_mark_active_stream(cnx_ctx->cnx, stream_ctx->stream_id, 1, stream_ctx);
 }
 
 int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code)
 {
+    if (quicdoq_ctx == NULL || query_ctx == NULL || error_code != 0) {
+        return -1;
+    }
     return 0;
 }

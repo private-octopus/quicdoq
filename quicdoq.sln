@@ -14,8 +14,15 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quicdoq_unittest", "quicdoq
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quicdoq_cli_test", "quicdoq_cli_test\quicdoq_cli_test.vcxproj", "{5F3CC205-F0C8-4A92-BADA-88F24758526F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8240BFA1-0213-404F-900A-BCB4195876EB} = {8240BFA1-0213-404F-900A-BCB4195876EB}
+		{D3B1D9E7-A473-471A-B613-F803EA9284FA} = {D3B1D9E7-A473-471A-B613-F803EA9284FA}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "quicdoq_cli_app", "quicdoq_cli_app\quicdoq_cli_app.vcxproj", "{91C2C852-4A7F-49EC-9747-6781E519FBA8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8240BFA1-0213-404F-900A-BCB4195876EB} = {8240BFA1-0213-404F-900A-BCB4195876EB}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

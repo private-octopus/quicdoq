@@ -97,7 +97,7 @@ uint8_t* quicdoq_add_label_num(uint8_t* text, uint8_t* text_max, char const* s,i
     return quicdoq_sprintf(text, text_max, "\"%s\":%d", s, v);
 }
 
-uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, uint8_t* data, size_t ldata)
+uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, const uint8_t* data, size_t ldata)
 {
     for (size_t i = 0; text != NULL && i < ldata; i++) {
         if (text + 2 > text_max) {
@@ -110,10 +110,10 @@ uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, uint8_t* data, size_t
 
             for (int j = 0; j < 2; j++) {
                 if (hex[j] < 10) {
-                    *text++ = '0' + hex[j];
+                    *text++ = (uint8_t)('0' + hex[j]);
                 }
                 else {
-                    *text++ = 'A' - 10 + hex[j];
+                    *text++ = (uint8_t)('A' - 10 + hex[j]);
                 }
             }
         }
@@ -122,7 +122,7 @@ uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, uint8_t* data, size_t
     return text;
 }
 
-uint8_t * NormalizeNamePart(size_t length, uint8_t* value,
+uint8_t * NormalizeNamePart(size_t length, const uint8_t* value,
     uint8_t* normalized, uint8_t * normalized_max)
 {
     if (normalized != NULL) {
@@ -162,7 +162,7 @@ uint8_t * NormalizeNamePart(size_t length, uint8_t* value,
 
                         *normalized++ = '\\';
                         for (int x = 0; x < 3; x++) {
-                            *normalized++ = '0' + dec[x];
+                            *normalized++ = (uint8_t)('0' + dec[x]);
                         }
                     }
                     else {
@@ -204,7 +204,7 @@ uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* n
             }
 
             if (c == '\\') {
-                int cx = 0;
+                uint8_t cx = 0;
 
                 for (int i = 0; data != NULL && i < 3; i++) {
                     int p = name[l++];
@@ -214,7 +214,7 @@ uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* n
                     }
                     else if (p >= '0' && p <= '9') {
                         cx *= 10;
-                        cx += p - '0';
+                        cx += (uint8_t)(p - '0');
                     }
                 }
                 c = cx;
@@ -300,7 +300,7 @@ uint8_t* quicdog_format_dns_query(uint8_t* data, uint8_t* data_max, char const* 
 /* Parse the DNS name component of a query or response.
  * Returns the index of the first character after the name.
  */
-size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
+size_t quicdoq_parse_dns_name(const uint8_t* packet, size_t length, size_t start,
     uint8_t** text_start, uint8_t *text_max)
 {
     size_t l = 0;
@@ -386,7 +386,7 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
     return start_next;
 }
 
-size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start)
+size_t quicdoq_skip_dns_name(const uint8_t* packet, size_t length, size_t start)
 {
     size_t l = 0;
     size_t start_next = 0;
@@ -441,7 +441,7 @@ size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start)
 
 /* Convert a DNS RR to a text string.
  */
-size_t quicdoq_parse_dns_RR(uint8_t* packet, size_t length, size_t start,
+size_t quicdoq_parse_dns_RR(const uint8_t* packet, size_t length, size_t start,
     uint8_t** text_start, uint8_t * text_max)
 {
 
@@ -489,6 +489,7 @@ size_t quicdoq_parse_dns_RR(uint8_t* packet, size_t length, size_t start,
             text = quicdoq_add_string(text, text_max, ": \"", 3);
             text = quicdoq_add_hex(text, text_max, packet + start, ldata);
             text = quicdoq_add_string(text, text_max, "\"}", 2);
+            start += ldata;
         }
     }
 
@@ -530,7 +531,7 @@ size_t quicdoq_parse_dns_RR(uint8_t* packet, size_t length, size_t start,
  * which might be useful at some point. We will see that later, but it
  * might be more appropriate to support one of the CBOR based logging formats.
  */
-size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
+size_t quicdoq_parse_dns_query(const uint8_t* packet, size_t length, size_t start,
     uint8_t** text_start, uint8_t* text_max)
 {
     if (*text_start == NULL || start + 12 > length) {
@@ -540,7 +541,7 @@ size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
     else
     {
         uint8_t* text = *text_start;
-        uint8_t* q_start = &packet[start];
+        const uint8_t* q_start = &packet[start];
         uint16_t id = (((uint16_t)q_start[0]) << 8) | packet[1];
         unsigned int QR = (q_start[2] >> 7) & 1;
         unsigned int opcode = (q_start[2] >> 3) & 15;
@@ -559,6 +560,8 @@ size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
         uint16_t qclass = 0;
         uint16_t xrcount[3];
         char const* xrname[3] = { "answerRRs", "authorityRRs", "additionalRRs" };
+
+        *text = 0;
 
         xrcount[0] = ancount;
         xrcount[1] = nscount;
@@ -641,4 +644,129 @@ size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
     }
 
     return start;
+}
+
+/* Get RR Code from RR Name
+ */
+
+const quicdoq_rr_entry_t rr_table[] = {
+    { "A", 1},
+    { "NS", 2},
+    { "MD", 3},
+    { "MF", 4},
+    { "CNAME", 5},
+    { "SOA", 6},
+    { "MB", 7},
+    { "MG", 8},
+    { "MR", 9},
+    { "NULL", 10},
+    { "WKS", 11},
+    { "PTR", 12},
+    { "HINFO", 13},
+    { "MINFO", 14},
+    { "MX", 15},
+    { "TXT", 16},
+    { "RP", 17},
+    { "AFSDB", 18},
+    { "X25", 19},
+    { "ISDN", 20},
+    { "RT", 21},
+    { "NSAP", 22},
+    { "NSAP-PTR", 23},
+    { "SIG", 24},
+    { "KEY", 25},
+    { "PX", 26},
+    { "GPOS", 27},
+    { "AAAA", 28},
+    { "LOC", 29},
+    { "NXT", 30},
+    { "EID", 31},
+    { "NIMLOC", 32},
+    { "SRV", 33},
+    { "ATMA", 34},
+    { "NAPTR", 35},
+    { "KX", 36},
+    { "CERT", 37},
+    { "A6", 38},
+    { "DNAME", 39},
+    { "SINK", 40},
+    { "OPT", 41},
+    { "APL", 42},
+    { "DS", 43},
+    { "SSHFP", 44},
+    { "IPSECKEY", 45},
+    { "RRSIG", 46},
+    { "NSEC", 47},
+    { "DNSKEY", 48},
+    { "DHCID", 49},
+    { "NSEC3", 50},
+    { "NSEC3PARAM", 51},
+    { "TLSA", 52},
+    { "SMIMEA", 53},
+    { "Unassigned", 54},
+    { "HIP", 55},
+    { "NINFO", 56},
+    { "RKEY", 57},
+    { "TALINK", 58},
+    { "CDS", 59},
+    { "CDNSKEY", 60},
+    { "OPENPGPKEY", 61},
+    { "CSYNC", 62},
+    { "ZONEMD", 63},
+    { "SPF", 99},
+    { "UINFO", 100},
+    { "UID", 101},
+    { "GID", 102},
+    { "UNSPEC", 103},
+    { "NID", 104},
+    { "L32", 105},
+    { "L64", 106},
+    { "LP", 107},
+    { "EUI48", 108},
+    { "EUI64", 109},
+    { "TKEY", 249},
+    { "TSIG", 250},
+    { "IXFR", 251},
+    { "AXFR", 252},
+    { "MAILB", 253},
+    { "MAILA", 254},
+    { "*", 255},
+    { "URI", 256},
+    { "CAA", 257},
+    { "AVC", 258},
+    { "DOA", 259},
+    { "AMTRELAY", 260},
+    { "TA", 32768},
+    { "DLV", 32769} };
+
+const size_t nb_rr_table = sizeof(rr_table) / sizeof(quicdoq_rr_entry_t);
+
+uint16_t quicdoq_get_rr_type(char const* rr_name) {
+    size_t x;
+    uint16_t rr_type = 0;
+
+    for (x = 0; x < nb_rr_table; x++) {
+        if (strcmp(rr_name, rr_table[x].rr_name) == 0) {
+            rr_type = rr_table[x].rr_type;
+            break;
+        }
+    }
+
+    if (rr_type == 0) {
+        for (int i = 0; 1; i++) {
+            int c = rr_name[i];
+
+            if (c == 0) {
+                break;
+            } else if (c >= '0' && c <= '9') {
+                rr_type = 10 * rr_type + (uint16_t)(c - '0');
+            }
+            else {
+                rr_type = UINT16_MAX;
+                break;
+            }
+        }
+    }
+
+    return rr_type;
 }

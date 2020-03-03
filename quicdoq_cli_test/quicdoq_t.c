@@ -45,6 +45,7 @@ static const picoquic_test_def_t test_table[] = {
     { "name_format", name_format_test },
     { "dns_query_parse", dns_query_parse_test },
     { "dns_query_format", dns_query_format_test },
+    { "rr_name_parse", rr_name_parse_test },
     { "basic", quicdoq_basic_test },
     { "basic_udp", quicdoq_basic_udp_test }
 };

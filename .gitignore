@@ -23,3 +23,9 @@
 /x64/Release
 /quicdoq_cli_test/x64/Debug
 /quicdoq_cli_app/x64/Debug
+/quicdoq_cli_app/Debug
+/quicdoq_cli_app/Release
+/quicdoq_cli_app/x64/Release
+/quicdoq_cli_test/Debug
+/quicdoq_cli_test/Release
+/quicdoq_cli_test/x64/Release

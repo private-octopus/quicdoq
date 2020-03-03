@@ -151,7 +151,7 @@ int quicdog_test_get_format_response(
 
     if (sizeof(rr_a) + query_length <= (size_t) response_max_size && query_length > 12) {
         /* Parse the DNS query to find the end of the first query */
-        uint16_t after_q = (uint16_t)quicdoq_skip_dns_name(query, query_length, 12);
+        size_t after_q = quicdoq_skip_dns_name(query, query_length, 12);
         if (after_q + 4 <= query_length) {
             qtype = (query[after_q] << 8) | query[after_q + 1];
             qclass = (query[after_q + 2] << 8) | query[after_q + 3];
@@ -228,7 +228,7 @@ int quicdoq_test_server_cb(
             ret = -1;
         }
         else {
-            test_ctx->record[qid].query_arrival_time = test_ctx->simulated_time;
+            test_ctx->record[qid].query_arrival_time = current_time;
             test_ctx->record[qid].query_received = 1;
             /* queue the response */
             if (!test_ctx->scenario[qid].is_success ||
@@ -273,7 +273,7 @@ int quicdoq_test_server_submit_response(quicdog_test_ctx_t* test_ctx)
     else {
         /* submit the response */
         if (test_ctx->record[test_ctx->next_response_id].queued_response->response_length > 0) {
-            ret = quicdoq_post_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response);
+            ret = quicdoq_post_response(test_ctx->record[test_ctx->next_response_id].queued_response);
         }
         else {
             ret = quicdoq_cancel_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response,
@@ -308,7 +308,7 @@ int quicdoq_test_client_cb(
     }
     else {
         test_ctx->record[qid].response_received = 1;
-        test_ctx->record[qid].response_arrival_time = test_ctx->simulated_time;
+        test_ctx->record[qid].response_arrival_time = current_time;
 
         switch (callback_code) {
         case quicdoq_response_complete: /* The response to the current query arrived. */
@@ -486,12 +486,12 @@ quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const 
         }
 
         /* create the client and server contexts */
-        test_ctx->qd_server = quicdoq_create(quicdoq_test_client_cb, (void*)test_ctx,
-            test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL,
+        test_ctx->qd_server = quicdoq_create(
+            test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL, NULL, NULL,
             quicdoq_test_server_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
-        test_ctx->qd_client = quicdoq_create(quicdoq_test_server_cb, (void*)test_ctx,
-            NULL, NULL, test_ctx->test_server_cert_store_file,
+        test_ctx->qd_client = quicdoq_create(
+            NULL, NULL, test_ctx->test_server_cert_store_file, NULL, NULL,
             quicdoq_test_client_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
 
@@ -597,6 +597,7 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, quicdoq_ctx_t*
 int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
 {
     int ret = 0;
+    int if_index = 0;
     picoquictest_sim_packet_t* packet = picoquictest_sim_link_create_packet();
 
     if (packet == NULL) {
@@ -605,14 +606,15 @@ int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_s
     }
     else {
         /* check whether there is something to send */
+        int length_to;
+        int length_from;
         quicdoq_udp_prepare_next_packet(test_ctx->udp_ctx, test_ctx->simulated_time,
-            packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length);
+            packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length,
+            &packet->addr_to, &length_to, &packet->addr_from, &length_from, &if_index);
     }
 
     if (ret == 0 && packet->length > 0) {
         *is_active = 1;
-        picoquic_store_addr(&packet->addr_to, (struct sockaddr *)&test_ctx->udp_ctx->udp_addr);
-        picoquic_store_addr(&packet->addr_from, (struct sockaddr*) & test_ctx->server_addr);
         picoquictest_sim_link_submit(link, packet, test_ctx->simulated_time);
     }
     else {
@@ -633,7 +635,8 @@ int quicdoq_test_sim_udp_input(quicdog_test_ctx_t* test_ctx, picoquictest_sim_li
     }
     else {
         *is_active = 1;
-        quicdoq_udp_incoming_packet(test_ctx->udp_ctx, packet->bytes, (uint32_t)packet->length, test_ctx->simulated_time);
+        quicdoq_udp_incoming_packet(test_ctx->udp_ctx, packet->bytes, (uint32_t)packet->length, 
+            (struct sockaddr*)&packet->addr_to, 0, test_ctx->simulated_time);
         free(packet);
     }
 
@@ -661,7 +664,7 @@ int quicdoq_test_sim_udp_output(quicdog_test_ctx_t* test_ctx, picoquictest_sim_l
                 break;
             }
             else {
-                qid = 10 * qid + c - '0';
+                qid = (uint16_t)(10 * qid + c - '0');
             }
         }
 
