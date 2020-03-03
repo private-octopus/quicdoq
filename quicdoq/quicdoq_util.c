@@ -97,7 +97,7 @@ uint8_t* quicdoq_add_label_num(uint8_t* text, uint8_t* text_max, char const* s,i
     return quicdoq_sprintf(text, text_max, "\"%s\":%d", s, v);
 }
 
-uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, uint8_t* data, size_t ldata)
+uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, const uint8_t* data, size_t ldata)
 {
     for (size_t i = 0; text != NULL && i < ldata; i++) {
         if (text + 2 > text_max) {
@@ -122,7 +122,7 @@ uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, uint8_t* data, size_t
     return text;
 }
 
-uint8_t * NormalizeNamePart(size_t length, uint8_t* value,
+uint8_t * NormalizeNamePart(size_t length, const uint8_t* value,
     uint8_t* normalized, uint8_t * normalized_max)
 {
     if (normalized != NULL) {
@@ -441,7 +441,7 @@ size_t quicdoq_skip_dns_name(const uint8_t* packet, size_t length, size_t start)
 
 /* Convert a DNS RR to a text string.
  */
-size_t quicdoq_parse_dns_RR(uint8_t* packet, size_t length, size_t start,
+size_t quicdoq_parse_dns_RR(const uint8_t* packet, size_t length, size_t start,
     uint8_t** text_start, uint8_t * text_max)
 {
 
