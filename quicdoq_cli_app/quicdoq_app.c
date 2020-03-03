@@ -143,12 +143,10 @@ int main(int argc, char** argv)
     uint64_t reset_seed_x[2];
     uint32_t proposed_version = 0;
     int client_cnx_id_length = 8;
-    int is_client = 0;
     const char** client_query_text = NULL;
     const char* default_query = "example.com:A";
-    const char* default_query_query_list[2] = { default_query, NULL };
+    const char* default_query_query_list[2]; 
     int nb_client_queries = 0;
-    FILE* F_log = NULL;
 
 #ifdef _WINDOWS
     WSADATA wsaData = { 0 };
@@ -265,6 +263,8 @@ int main(int argc, char** argv)
             nb_client_queries = argc - optind;
         }
         else {
+            default_query_query_list[0] = default_query;
+            default_query_query_list[1] = NULL;
             client_query_text = default_query_query_list;
             nb_client_queries = 1;
         }
@@ -374,7 +374,7 @@ int quicdoq_demo_server(const char* server_cert_file, const char* server_key_fil
     int use_long_log, int server_port, int dest_if, int mtu_max, int do_retry,
     uint64_t* reset_seed, char const * cc_algo_id)
 {
-    int ret;
+    int ret = 0;
     char default_server_cert_file[512];
     char default_server_key_file[512];
     quicdoq_ctx_t * qd_server = NULL;
@@ -385,11 +385,15 @@ int quicdoq_demo_server(const char* server_cert_file, const char* server_key_fil
     struct sockaddr_storage addr_to;
     socklen_t from_length;
     socklen_t to_length;
-    int if_index_to;
+    unsigned long if_index_to;
     int nb_loops = 0;
     uint8_t buffer[PICOQUIC_MAX_PACKET_SIZE];
     uint8_t send_buffer[PICOQUIC_MAX_PACKET_SIZE];
     FILE* F_log = NULL;
+
+#ifdef _WINDOWS
+    UNREFERENCED_PARAMETER(reset_seed);
+#endif
 
     if (solution_dir == NULL) {
 #ifdef _WINDOWS
@@ -634,15 +638,20 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
     FILE* F_log = NULL;
     quicdoq_demo_client_ctx_t client_ctx;
 
+#ifdef _WINDOWS
+    UNREFERENCED_PARAMETER(alpn);
+    UNREFERENCED_PARAMETER(dest_if);
+    UNREFERENCED_PARAMETER(esni_rr_file);
+#endif
+
     current_time = picoquic_current_time();
     time_out = current_time + 60000000;
+    memset(&client_ctx, 0, sizeof(quicdoq_demo_client_ctx_t));
+    memset(&client_address, 0, sizeof(struct sockaddr_storage));
 
-    if (ret == 0) {
-        memset(&client_address, 0, sizeof(struct sockaddr_storage));
-        ret = picoquic_get_server_address(server_name, server_port, &server_address, &server_addr_length, &is_name);
-        if (sni == NULL && is_name != 0) {
-            sni = server_name;
-        }
+    ret = picoquic_get_server_address(server_name, server_port, &server_address, &server_addr_length, &is_name);
+    if (sni == NULL && is_name != 0) {
+        sni = server_name;
     }
 
     /* Open a UDP socket */
@@ -728,15 +737,18 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
              * the number of packets that can be received before sending responses. */
 
             if (bytes_recv == 0 || (ret == 0 && client_receive_loop > QUICDOQ_DEMO_CLIENT_MAX_RECEIVE_BATCH)) {
+                int x_from_length = 0;
+                int x_to_length = 0;
+                int x_if_index_to;
                 client_receive_loop = 0;
 
                 ret = picoquic_prepare_next_packet(qclient, current_time,
                     send_buffer, PICOQUIC_MAX_PACKET_SIZE, &send_length,
-                    &packet_to, &to_length, &packet_from, &from_length, &if_index_to);
+                    &packet_to, &x_to_length, &packet_from, &x_from_length, &x_if_index_to);
 
                 if (ret == 0 && send_length > 0) {
                     bytes_sent = sendto(fd, (const char*)send_buffer, (int)send_length, 0,
-                        (struct sockaddr*) & packet_to, to_length);
+                        (struct sockaddr*) & packet_to, x_to_length);
 
                     if (bytes_sent <= 0)
                     {
@@ -845,11 +857,11 @@ int quicdoq_demo_client_init_context(quicdoq_ctx_t* qd_client, quicdoq_demo_clie
         ret = -1;
     }
     else {
-        client_ctx->nb_client_queries = nb_client_queries;
+        client_ctx->nb_client_queries = (uint16_t)nb_client_queries;
         memset(client_ctx->query_ctx, 0, sizeof(quicdoq_query_ctx_t*) * nb_client_queries);
         memset(client_ctx->is_query_complete, 0, sizeof(int) * nb_client_queries);
 
-        for (size_t i = 0; ret == 0 && i < nb_client_queries; i++) {
+        for (int i = 0; ret == 0 && i < nb_client_queries; i++) {
             client_ctx->query_ctx[i] = quicdoq_create_query_ctx(1536, 1536);
             if (client_ctx->query_ctx[i] == NULL) {
                 ret = -1;
@@ -866,7 +878,7 @@ int quicdoq_demo_client_init_context(quicdoq_ctx_t* qd_client, quicdoq_demo_clie
         }
     }
 
-    for (size_t i = 0; ret == 0 && i < nb_client_queries; i++) {
+    for (int i = 0; ret == 0 && i < nb_client_queries; i++) {
         ret = quicdoq_post_query(qd_client, client_ctx->query_ctx[i]);
     }
 
@@ -892,7 +904,7 @@ void quicdoq_demo_print_response(quicdoq_query_ctx_t* query_ctx)
 {
     char query_out[2048];
     size_t next;
-    uint8_t* text_start = query_out;
+    uint8_t* text_start = (uint8_t *)query_out;
 
     next = quicdoq_parse_dns_query(query_ctx->response, query_ctx->response_length, 0, (uint8_t **)&text_start,
         (uint8_t*)query_out + sizeof(query_out));

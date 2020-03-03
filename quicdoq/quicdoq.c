@@ -189,6 +189,10 @@ int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, qu
     int ret = 0;
     uint8_t* data;
     size_t data_length;
+#ifdef _WINDOWS
+    UNREFERENCED_PARAMETER(stream_id);
+    UNREFERENCED_PARAMETER(cnx);
+#endif
 
     if (cnx_ctx->is_server) {
         data = stream_ctx->query_ctx->response;
@@ -584,10 +588,13 @@ int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ct
 
 int quicdoq_cancel_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx)
 {
+    if (quicdoq_ctx == NULL || query_ctx == NULL) {
+        return -1;
+    }
     return 0;
 }
 
-int quicdoq_post_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx)
+int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx)
 {
     quicdoq_stream_ctx_t* stream_ctx = (quicdoq_stream_ctx_t*)query_ctx->client_cb_ctx;
     quicdoq_cnx_ctx_t* cnx_ctx = stream_ctx->cnx_ctx;
@@ -598,5 +605,8 @@ int quicdoq_post_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query
 
 int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code)
 {
+    if (quicdoq_ctx == NULL || query_ctx == NULL || error_code != 0) {
+        return -1;
+    }
     return 0;
 }

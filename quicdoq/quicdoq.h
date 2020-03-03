@@ -196,7 +196,7 @@ extern "C" {
 
     int quicdoq_cancel_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
 
-    int quicdoq_post_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx);
+    int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx);
 
     int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code);
 

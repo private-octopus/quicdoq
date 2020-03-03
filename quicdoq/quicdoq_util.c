@@ -110,10 +110,10 @@ uint8_t* quicdoq_add_hex(uint8_t* text, uint8_t* text_max, const uint8_t* data, 
 
             for (int j = 0; j < 2; j++) {
                 if (hex[j] < 10) {
-                    *text++ = '0' + hex[j];
+                    *text++ = (uint8_t)('0' + hex[j]);
                 }
                 else {
-                    *text++ = 'A' - 10 + hex[j];
+                    *text++ = (uint8_t)('A' - 10 + hex[j]);
                 }
             }
         }
@@ -162,7 +162,7 @@ uint8_t * NormalizeNamePart(size_t length, const uint8_t* value,
 
                         *normalized++ = '\\';
                         for (int x = 0; x < 3; x++) {
-                            *normalized++ = '0' + dec[x];
+                            *normalized++ = (uint8_t)('0' + dec[x]);
                         }
                     }
                     else {
@@ -204,7 +204,7 @@ uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* n
             }
 
             if (c == '\\') {
-                int cx = 0;
+                uint8_t cx = 0;
 
                 for (int i = 0; data != NULL && i < 3; i++) {
                     int p = name[l++];
@@ -214,7 +214,7 @@ uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* n
                     }
                     else if (p >= '0' && p <= '9') {
                         cx *= 10;
-                        cx += p - '0';
+                        cx += (uint8_t)(p - '0');
                     }
                 }
                 c = cx;
@@ -541,7 +541,7 @@ size_t quicdoq_parse_dns_query(const uint8_t* packet, size_t length, size_t star
     else
     {
         uint8_t* text = *text_start;
-        uint8_t* q_start = &packet[start];
+        const uint8_t* q_start = &packet[start];
         uint16_t id = (((uint16_t)q_start[0]) << 8) | packet[1];
         unsigned int QR = (q_start[2] >> 7) & 1;
         unsigned int opcode = (q_start[2] >> 3) & 15;

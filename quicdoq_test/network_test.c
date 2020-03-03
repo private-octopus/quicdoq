@@ -151,7 +151,7 @@ int quicdog_test_get_format_response(
 
     if (sizeof(rr_a) + query_length <= (size_t) response_max_size && query_length > 12) {
         /* Parse the DNS query to find the end of the first query */
-        uint16_t after_q = (uint16_t)quicdoq_skip_dns_name(query, query_length, 12);
+        size_t after_q = quicdoq_skip_dns_name(query, query_length, 12);
         if (after_q + 4 <= query_length) {
             qtype = (query[after_q] << 8) | query[after_q + 1];
             qclass = (query[after_q + 2] << 8) | query[after_q + 3];
@@ -228,7 +228,7 @@ int quicdoq_test_server_cb(
             ret = -1;
         }
         else {
-            test_ctx->record[qid].query_arrival_time = test_ctx->simulated_time;
+            test_ctx->record[qid].query_arrival_time = current_time;
             test_ctx->record[qid].query_received = 1;
             /* queue the response */
             if (!test_ctx->scenario[qid].is_success ||
@@ -273,7 +273,7 @@ int quicdoq_test_server_submit_response(quicdog_test_ctx_t* test_ctx)
     else {
         /* submit the response */
         if (test_ctx->record[test_ctx->next_response_id].queued_response->response_length > 0) {
-            ret = quicdoq_post_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response);
+            ret = quicdoq_post_response(test_ctx->record[test_ctx->next_response_id].queued_response);
         }
         else {
             ret = quicdoq_cancel_response(test_ctx->qd_server, test_ctx->record[test_ctx->next_response_id].queued_response,
@@ -308,7 +308,7 @@ int quicdoq_test_client_cb(
     }
     else {
         test_ctx->record[qid].response_received = 1;
-        test_ctx->record[qid].response_arrival_time = test_ctx->simulated_time;
+        test_ctx->record[qid].response_arrival_time = current_time;
 
         switch (callback_code) {
         case quicdoq_response_complete: /* The response to the current query arrived. */
@@ -664,7 +664,7 @@ int quicdoq_test_sim_udp_output(quicdog_test_ctx_t* test_ctx, picoquictest_sim_l
                 break;
             }
             else {
-                qid = 10 * qid + c - '0';
+                qid = (uint16_t)(10 * qid + c - '0');
             }
         }
 
