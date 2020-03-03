@@ -300,7 +300,7 @@ uint8_t* quicdog_format_dns_query(uint8_t* data, uint8_t* data_max, char const* 
 /* Parse the DNS name component of a query or response.
  * Returns the index of the first character after the name.
  */
-size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
+size_t quicdoq_parse_dns_name(const uint8_t* packet, size_t length, size_t start,
     uint8_t** text_start, uint8_t *text_max)
 {
     size_t l = 0;
@@ -386,7 +386,7 @@ size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
     return start_next;
 }
 
-size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start)
+size_t quicdoq_skip_dns_name(const uint8_t* packet, size_t length, size_t start)
 {
     size_t l = 0;
     size_t start_next = 0;
@@ -531,7 +531,7 @@ size_t quicdoq_parse_dns_RR(uint8_t* packet, size_t length, size_t start,
  * which might be useful at some point. We will see that later, but it
  * might be more appropriate to support one of the CBOR based logging formats.
  */
-size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
+size_t quicdoq_parse_dns_query(const uint8_t* packet, size_t length, size_t start,
     uint8_t** text_start, uint8_t* text_max)
 {
     if (*text_start == NULL || start + 12 > length) {

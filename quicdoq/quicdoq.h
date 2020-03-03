@@ -209,10 +209,10 @@ extern "C" {
     uint8_t* quicdog_format_dns_name(uint8_t* data, uint8_t* data_max, char const* name);
     uint8_t* quicdog_format_dns_query(uint8_t* data, uint8_t* data_max, char const* qname,
         uint16_t id, uint16_t qclass, uint16_t qtype, uint16_t l_max);
-    size_t quicdoq_parse_dns_name(uint8_t* packet, size_t length, size_t start,
+    size_t quicdoq_parse_dns_name(const uint8_t* packet, size_t length, size_t start,
         uint8_t** text_start, uint8_t* text_max);
-    size_t quicdoq_skip_dns_name(uint8_t* packet, size_t length, size_t start);
-    size_t quicdoq_parse_dns_query(uint8_t* packet, size_t length, size_t start,
+    size_t quicdoq_skip_dns_name(const uint8_t* packet, size_t length, size_t start);
+    size_t quicdoq_parse_dns_query(const uint8_t* packet, size_t length, size_t start,
         uint8_t** text_start, uint8_t* text_max);
 
     uint16_t quicdoq_get_rr_type(char const* rr_name);
