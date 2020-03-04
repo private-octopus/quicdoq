@@ -113,8 +113,9 @@
 extern "C" {
 #endif
 
-/* DoQ ALPN */
-#define QUICDOQ_ALPN "doq"
+/* DoQ ALPN and DoQ port -- as defined in draft */
+#define QUICDOQ_ALPN "dq-h00"
+#define QUICDOQ_PORT 864
 
 /* DoQ error codes */
 #define QUICDOQ_ERROR_INTERNAL 0x201
@@ -167,7 +168,7 @@ extern "C" {
      * provide isolation between the app and the stack.
      */
     typedef struct st_quicdoq_ctx_t quicdoq_ctx_t;
-    quicdoq_ctx_t* quicdoq_create(
+    quicdoq_ctx_t* quicdoq_create(char const * alpn,
         char const* cert_file_name, char const* key_file_name, char const* cert_root_file_name,
         char* ticket_store_file_name, char* token_store_file_name,
         quicdoq_app_cb_fn app_cb_fn, void * app_cb_ctx,
