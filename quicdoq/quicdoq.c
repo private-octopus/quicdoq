@@ -471,7 +471,7 @@ void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx)
 
 /* Create a quidoq node with the associated context
  */
-quicdoq_ctx_t * quicdoq_create(
+quicdoq_ctx_t * quicdoq_create(char const * alpn,
     char const * cert_file_name, char const * key_file_name, char const * cert_root_file_name,
     char * ticket_store_file_name, char * token_store_file_name,
     quicdoq_app_cb_fn app_cb_fn, void* app_cb_ctx, uint64_t * simulated_time)
@@ -491,9 +491,12 @@ quicdoq_ctx_t * quicdoq_create(
         quicdoq_ctx->default_callback_ctx.quicdoq_ctx = quicdoq_ctx;
         quicdoq_ctx->app_cb_fn = app_cb_fn;
         quicdoq_ctx->app_cb_ctx = app_cb_ctx;
+        if (alpn == NULL) {
+            alpn = QUICDOQ_ALPN;
+        }
 
         quicdoq_ctx->quic = picoquic_create(64, cert_file_name, key_file_name, cert_root_file_name,
-            QUICDOQ_ALPN, quicdoq_callback, &quicdoq_ctx->default_callback_ctx, NULL, NULL, NULL, current_time, simulated_time,
+            alpn, quicdoq_callback, &quicdoq_ctx->default_callback_ctx, NULL, NULL, NULL, current_time, simulated_time,
             ticket_store_file_name, NULL, 0);
 
         if (quicdoq_ctx->quic == NULL) {

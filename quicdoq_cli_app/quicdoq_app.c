@@ -85,9 +85,6 @@
 
 #endif
 
-
-uint16_t default_server_port = 7763;
-
 typedef struct st_quicdoq_demo_client_ctx_t {
     quicdoq_ctx_t* qd_client;
     char test_server_cert_store_file[512];
@@ -102,7 +99,8 @@ typedef struct st_quicdoq_demo_client_ctx_t {
 
 void usage();
 uint32_t parse_target_version(char const* v_arg);
-int quicdoq_demo_server(const char* server_cert_file, const char* server_key_file,
+int quicdoq_demo_server(
+    const char* alpn, const char* server_cert_file, const char* server_key_file,
     const char* esni_key_file, const char* esni_rr_file, const char* log_file,
     const char* bin_file, const char* backend_dns_server, const char* solution_dir,
     int use_long_log, int server_port, int dest_if, int mtu_max, int do_retry,
@@ -135,7 +133,7 @@ int main(int argc, char** argv)
     const char* cc_algo_id = NULL;
 
     int use_long_log = 0;
-    int server_port = default_server_port;
+    int server_port = QUICDOQ_PORT;
     int dest_if = -1;
     int mtu_max = 0;
     int do_retry = 0;
@@ -275,7 +273,7 @@ int main(int argc, char** argv)
     }
     else {
         /* start server using specified options */
-        ret = quicdoq_demo_server(server_cert_file, server_key_file, esni_key_file, esni_rr_file, 
+        ret = quicdoq_demo_server(alpn, server_cert_file, server_key_file, esni_key_file, esni_rr_file, 
             log_file, bin_file, backend_dns_server, solution_dir, use_long_log, server_port, dest_if, 
             mtu_max, do_retry, reset_seed, cc_algo_id);
     }
@@ -297,7 +295,7 @@ void usage()
     fprintf(stderr, "  -l file               Log file, Log to stdout if file = \"n\". No logging if absent.\n");
     fprintf(stderr, "  -b file               Binary log file. No binary logging if absent.\n");
     fprintf(stderr, "  -L                    Log all packets. If absent, log stops after 100 packets.\n");
-    fprintf(stderr, "  -p port               server port (default: %d)\n", default_server_port);
+    fprintf(stderr, "  -p port               server port (default: %d)\n", QUICDOQ_PORT);
     fprintf(stderr, "  -e if                 Send on interface (default: -1)\n");
     fprintf(stderr, "                           -1: receiving interface\n");
     fprintf(stderr, "                            0: routing lookup\n");
@@ -368,7 +366,8 @@ uint32_t parse_target_version(char const* v_arg)
  * 
  */
 
-int quicdoq_demo_server(const char* server_cert_file, const char* server_key_file,
+int quicdoq_demo_server(
+    const char* alpn, const char* server_cert_file, const char* server_key_file,
     const char* esni_key_file, const char* esni_rr_file, const char* log_file,
     const char* bin_file, const char* backend_dns_server, const char* solution_dir,
     int use_long_log, int server_port, int dest_if, int mtu_max, int do_retry,
@@ -441,7 +440,7 @@ int quicdoq_demo_server(const char* server_cert_file, const char* server_key_fil
     /* Create the server context */
     if (ret == 0) {
         /* Create a Quic Doq context for the server */
-        qd_server = quicdoq_create(server_cert_file, server_key_file, NULL, NULL, NULL,
+        qd_server = quicdoq_create(alpn, server_cert_file, server_key_file, NULL, NULL, NULL,
             quicdoq_udp_callback, NULL, NULL);
         if (qd_server == NULL) {
             ret = -1;
@@ -639,7 +638,6 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
     quicdoq_demo_client_ctx_t client_ctx;
 
 #ifdef _WINDOWS
-    UNREFERENCED_PARAMETER(alpn);
     UNREFERENCED_PARAMETER(dest_if);
     UNREFERENCED_PARAMETER(esni_rr_file);
 #endif
@@ -667,7 +665,7 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
 
     if (ret == 0) {
         /* TODO: token and ticket files! */
-        qd_client = quicdoq_create(NULL, NULL, root_crt, NULL, NULL, quicdoq_demo_client_cb, (void*)&client_ctx, NULL);
+        qd_client = quicdoq_create(alpn, NULL, NULL, root_crt, NULL, NULL, quicdoq_demo_client_cb, (void*)&client_ctx, NULL);
 
         if (qd_client == NULL) {
             ret = -1;

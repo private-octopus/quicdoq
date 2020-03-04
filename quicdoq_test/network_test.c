@@ -486,11 +486,11 @@ quicdog_test_ctx_t* quicdoq_test_ctx_create(quicdoq_test_scenario_entry_t const 
         }
 
         /* create the client and server contexts */
-        test_ctx->qd_server = quicdoq_create(
+        test_ctx->qd_server = quicdoq_create(NULL,
             test_ctx->test_server_cert_file, test_ctx->test_server_key_file, NULL, NULL, NULL,
             quicdoq_test_server_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
-        test_ctx->qd_client = quicdoq_create(
+        test_ctx->qd_client = quicdoq_create(NULL,
             NULL, NULL, test_ctx->test_server_cert_store_file, NULL, NULL,
             quicdoq_test_client_cb, (void*)test_ctx,
             &test_ctx->simulated_time);
