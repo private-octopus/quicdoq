@@ -190,7 +190,7 @@ int quicdoq_udp_callback(
 
 void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
     uint64_t current_time, uint8_t* send_buffer, size_t send_buffer_max, size_t* send_length,
-    struct sockaddr_storage* p_addr_to, int* to_len, struct sockaddr_storage* p_addr_from, int* from_len, int* if_index)
+    struct sockaddr_storage* p_addr_to,struct sockaddr_storage* p_addr_from, int* if_index)
 {
     quicdog_udp_queued_t* quq_ctx = udp_ctx->first_query;
 
@@ -224,8 +224,8 @@ void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
                 quq_ctx->udp_query_id, current_time - quq_ctx->query_arrival_time);
             quq_ctx->next_send_time = current_time + udp_ctx->rto;
             quicdoq_udp_reinsert_in_list(udp_ctx, quq_ctx);
-            *to_len = picoquic_store_addr(p_addr_to, (struct sockaddr*)&udp_ctx->udp_addr);
-            *from_len = picoquic_store_addr(p_addr_from, (struct sockaddr*) & udp_ctx->local_addr);
+            picoquic_store_addr(p_addr_to, (struct sockaddr*)&udp_ctx->udp_addr);
+            picoquic_store_addr(p_addr_from, (struct sockaddr*) & udp_ctx->local_addr);
             if (udp_ctx->if_index >= 0) {
                 *if_index = udp_ctx->if_index;
             }

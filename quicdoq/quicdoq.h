@@ -114,7 +114,7 @@ extern "C" {
 #endif
 
 /* DoQ ALPN and DoQ port -- as defined in draft */
-#define QUICDOQ_ALPN "dq-h00"
+#define QUICDOQ_ALPN "doq-h00"
 #define QUICDOQ_PORT 864
 
 /* DoQ error codes */
@@ -227,7 +227,7 @@ extern "C" {
         quicdoq_query_ctx_t* query_ctx, uint64_t current_time);
     void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
         uint64_t current_time, uint8_t* send_buffer, size_t send_buffer_max, size_t* send_length,
-        struct sockaddr_storage* p_addr_to, int* to_len, struct sockaddr_storage* p_addr_from, int* from_len, int* if_index);
+        struct sockaddr_storage* p_addr_to, struct sockaddr_storage* p_addr_from, int* if_index);
     void quicdoq_udp_incoming_packet(quicdoq_udp_ctx_t* udp_ctx, uint8_t* bytes, size_t length, 
         struct sockaddr* addr_to, int if_index_to, uint64_t current_time);
     uint64_t quicdoq_next_udp_time(quicdoq_udp_ctx_t* udp_ctx);
