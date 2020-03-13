@@ -2,10 +2,32 @@
 
 Quicdoq is a simple implementation of DNS over Quic, as specified in
 [draft-huitema-quic-dnsoquic](https://datatracker.ietf.org/doc/draft-huitema-quic-dnsoquic/).
-It is based on [Picoquic](https://github.com/private-octopus/picoquic).
+It is written in C, based on [Picoquic](https://github.com/private-octopus/picoquic).
 Like Picoquic itself, it has a dependency
 on the [Picotls implementation of TLS 1.3](https://github.com/h2o/picotls),
 and on the Crytographic Libraries of OpenSSL.
+
+# Quicdoq components
+
+The Quicdoq distribution has three main components:
+
+1) A library that implements the DNS over QUIC specification. 
+   The library defines a call back API that can be used to implement DoQ client or a DoQ server.
+
+2) A simple UDP backend that exercises the callback API and provides an interface
+   between Quicdoq and an UDP based DNS service. 
+
+3) A command line application that can be used either as simple client or to
+   instantiate the UDP backed server.
+
+Partners can use the library to enable DNS over QUIC in existing DNS clients or DNS servers.
+
+The sample application can be used to quickly prototype DNS over Quic with an existing
+server, using a local UDP connection to submit queries from Quicdoq to the local server.
+
+The sample client implementation is not meant for production use. It is mainly a
+demonstration tool. It can be used to quickly enter a few queries, and see the responses
+coming back from the selected server.
 
 # Building Quicdoq
 

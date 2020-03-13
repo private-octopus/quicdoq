@@ -546,9 +546,7 @@ int quicdoq_demo_server(
             }
 
             do {
-                int peer_addr_len = 0;
                 struct sockaddr_storage peer_addr;
-                int local_addr_len = 0;
                 struct sockaddr_storage local_addr;
                 int if_index = dest_if;
 
@@ -560,19 +558,19 @@ int quicdoq_demo_server(
                     /* check whether there is something to send */
                     quicdoq_udp_prepare_next_packet(udp_ctx, loop_time,
                         send_buffer, sizeof(send_buffer), &send_length,
-                        &peer_addr, &peer_addr_len, &local_addr, &local_addr_len, &if_index);
+                        &peer_addr, &local_addr, &if_index);
                 }
 
                 if (send_length == 0 && picoquic_get_next_wake_time(quicdoq_get_quic_ctx(qd_server), current_time) <= current_time) {
                     ret = picoquic_prepare_next_packet(quicdoq_get_quic_ctx(qd_server), loop_time,
                         send_buffer, sizeof(send_buffer), &send_length,
-                        &peer_addr, &peer_addr_len, &local_addr, &local_addr_len, &if_index);
+                        &peer_addr, &local_addr, &if_index);
                 }
 
                 if (ret == 0 && send_length > 0) {
                     nb_loops = 0;
                     (void)picoquic_send_through_server_sockets(&server_sockets,
-                        (struct sockaddr*) & peer_addr, peer_addr_len, (struct sockaddr*) & local_addr, local_addr_len, if_index,
+                        (struct sockaddr*) & peer_addr,(struct sockaddr*) & local_addr, if_index,
                         (const char*)send_buffer, (int)send_length);
                 }
 
@@ -735,18 +733,16 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
              * the number of packets that can be received before sending responses. */
 
             if (bytes_recv == 0 || (ret == 0 && client_receive_loop > QUICDOQ_DEMO_CLIENT_MAX_RECEIVE_BATCH)) {
-                int x_from_length = 0;
-                int x_to_length = 0;
                 int x_if_index_to;
                 client_receive_loop = 0;
 
                 ret = picoquic_prepare_next_packet(qclient, current_time,
                     send_buffer, PICOQUIC_MAX_PACKET_SIZE, &send_length,
-                    &packet_to, &x_to_length, &packet_from, &x_from_length, &x_if_index_to);
+                    &packet_to, &packet_from, &x_if_index_to);
 
                 if (ret == 0 && send_length > 0) {
                     bytes_sent = sendto(fd, (const char*)send_buffer, (int)send_length, 0,
-                        (struct sockaddr*) & packet_to, x_to_length);
+                        (struct sockaddr*) & packet_to, picoquic_addr_length((struct sockaddr*) & packet_to));
 
                     if (bytes_sent <= 0)
                     {
