@@ -541,7 +541,7 @@ quicdoq_ctx_t * quicdoq_create(char const * alpn,
         }
         else {
             if (quicdoq_set_tp(quicdoq_ctx, NULL, 2048) != 0) {
-                DBG_PRINTF("Could not set default transport parameters.");
+                DBG_PRINTF("%s", "Could not set default transport parameters.");
             }
             /* Load the tokens if present. */
             if (token_store_file_name != NULL) {
