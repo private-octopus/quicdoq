@@ -349,6 +349,10 @@ quicdoq_cnx_ctx_t* quicdoq_create_client_cnx(quicdoq_ctx_t* quicdoq_ctx, char co
             cnx_ctx->sni = picoquic_string_duplicate(sni);
             picoquic_set_callback(cnx, quicdoq_callback, cnx_ctx);
 
+            if (quicdoq_set_tp(quicdoq_ctx, cnx, 2048) != 0) {
+                DBG_PRINTF("%s", "Cannot set parameters for client connection");
+            }
+
             if (picoquic_start_client_cnx(cnx) != 0) {
                 picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                 DBG_PRINTF("Could not start the connection to %s", sni);
@@ -469,6 +473,38 @@ void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx)
     free(query_ctx);
 }
 
+/* Set transport parameters to adequate value for quicdoq server.
+ */
+int quicdoq_set_tp(quicdoq_ctx_t* quicdoq_ctx, picoquic_cnx_t * cnx, uint64_t max_size)
+{
+    int ret = 0;
+    picoquic_tp_t tp;
+    memset(&tp, 0, sizeof(picoquic_tp_t));
+    if (cnx == NULL) {
+        tp.initial_max_stream_data_bidi_local = max_size;
+        tp.initial_max_stream_data_bidi_remote = max_size;
+        tp.initial_max_stream_id_bidir = 256;
+    }
+    else {
+        tp.initial_max_stream_data_bidi_local = 0;
+        tp.initial_max_stream_data_bidi_remote = max_size;
+        tp.initial_max_stream_id_bidir = 0;
+    }
+    tp.initial_max_stream_data_uni = 0;
+    tp.initial_max_data = 0x10000;
+    tp.initial_max_stream_id_unidir = 0;
+    tp.idle_timeout = 20000;
+    tp.max_packet_size = 1232;
+    tp.max_ack_delay = 10000;
+    tp.active_connection_id_limit = 3;
+    tp.ack_delay_exponent = 3;
+    tp.migration_disabled = 0;
+    /* tp.prefered_address: todo, consider use of preferred address for anycast server */
+    /* all optional parameters set to zero */
+    ret = picoquic_set_default_tp(quicdoq_ctx->quic, &tp);
+    return ret;
+}
+
 /* Create a quidoq node with the associated context
  */
 quicdoq_ctx_t * quicdoq_create(char const * alpn,
@@ -504,6 +540,9 @@ quicdoq_ctx_t * quicdoq_create(char const * alpn,
             quicdoq_ctx = NULL;
         }
         else {
+            if (quicdoq_set_tp(quicdoq_ctx, NULL, 2048) != 0) {
+                DBG_PRINTF("%s", "Could not set default transport parameters.");
+            }
             /* Load the tokens if present. */
             if (token_store_file_name != NULL) {
 #if 0
