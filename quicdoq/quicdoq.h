@@ -201,6 +201,8 @@ extern "C" {
 
     int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code);
 
+    int quicdoq_is_backlog_empty(quicdoq_ctx_t* quicdoq_ctx);
+
     /* Utility functions for formatting DNS messages */
     typedef struct st_quicdoq_rr_entry_t {
         char const* rr_name;

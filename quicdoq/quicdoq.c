@@ -545,19 +545,14 @@ quicdoq_ctx_t * quicdoq_create(char const * alpn,
             }
             /* Load the tokens if present. */
             if (token_store_file_name != NULL) {
-#if 0
-                /* TODO: load tokens API */
-                ret = picoquic_load_tokens(quicdoq_ctx->quic->p_first_token, current_time, token_file_name);
+                int ret = picoquic_load_retry_tokens(quicdoq_ctx->quic, token_store_file_name);
 
                 if (ret == PICOQUIC_ERROR_NO_SUCH_FILE) {
-                    DBG_PRINTF("Ticket file <%s> not created yet.\n", ticket_file_name);
-                    ret = 0;
+                    DBG_PRINTF("Ticket file <%s> not created yet.\n", token_store_file_name);
                 }
                 else if (ret != 0) {
-                    DBG_PRINTF("Cannot load tickets from <%s>\n", ticket_file_name);
-                    ret = 0;
+                    DBG_PRINTF("Cannot load tickets from <%s>\n", token_store_file_name);
                 }
-#endif
             }
         }
     }
@@ -651,4 +646,21 @@ int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* que
         return -1;
     }
     return 0;
+}
+
+int quicdoq_is_backlog_empty(quicdoq_ctx_t* quicdoq_ctx)
+{
+    quicdoq_cnx_ctx_t* cnx_ctx = quicdoq_ctx->first_cnx;
+    int is_empty = 1;
+
+    while (cnx_ctx != NULL) {
+        is_empty &= picoquic_is_cnx_backlog_empty(cnx_ctx->cnx);
+        if (!is_empty) {
+            break;
+        }
+        else {
+            cnx_ctx = cnx_ctx->next_cnx;
+        }
+    }
+    return is_empty;
 }

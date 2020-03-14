@@ -11,12 +11,12 @@
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-l debug_log.txt -d 8.8.8.8 -p 864</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-l server_log.txt -d 8.8.8.8 -p 864</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>-l debug_log.txt -d 8.8.8.8 -p 7763</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments> -l test_log.txt -m 1232 localhost 864 google.com</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
