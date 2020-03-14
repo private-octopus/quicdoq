@@ -389,8 +389,6 @@ int quicdoq_demo_server(
     uint8_t buffer[PICOQUIC_MAX_PACKET_SIZE];
     uint8_t send_buffer[PICOQUIC_MAX_PACKET_SIZE];
     FILE* F_log = NULL;
-    char const* ticket_file = "quicdoq_client_tickets.bin";
-    char const* token_file = "quicdoq_client_tokens.bin";
 
 #ifdef _WINDOWS
     UNREFERENCED_PARAMETER(reset_seed);
@@ -442,7 +440,7 @@ int quicdoq_demo_server(
     /* Create the server context */
     if (ret == 0) {
         /* Create a Quic Doq context for the server */
-        qd_server = quicdoq_create(alpn, server_cert_file, server_key_file, NULL, ticket_file, token_file,
+        qd_server = quicdoq_create(alpn, server_cert_file, server_key_file, NULL, NULL, NULL,
             quicdoq_udp_callback, NULL, NULL);
         if (qd_server == NULL) {
             ret = -1;
@@ -606,7 +604,7 @@ int quicdoq_demo_server(
 int quicdoq_client(const char* server_name, int server_port, int dest_if,
     const char* sni, const char* esni_rr_file, const char* alpn, const char* root_crt,
     int mtu_max, const char* log_file, char const* bin_file, int use_long_log,
-    int client_cnx_id_length, char const * cc_algo_id,
+    int client_cnx_id_length, char const* cc_algo_id,
     int nb_client_queries, char const** client_query_text)
 {
     /* Start: start the QUIC process with cert and key files */
@@ -636,6 +634,8 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
     unsigned char received_ecn;
     FILE* F_log = NULL;
     quicdoq_demo_client_ctx_t client_ctx;
+    char const* ticket_file = "quicdoq_client_tickets.bin";
+    char const* token_file = "quicdoq_client_tokens.bin";
 
 #ifdef _WINDOWS
     UNREFERENCED_PARAMETER(dest_if);
@@ -665,7 +665,7 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
 
     if (ret == 0) {
         /* TODO: token and ticket files! */
-        qd_client = quicdoq_create(alpn, NULL, NULL, root_crt, NULL, NULL, quicdoq_demo_client_cb, (void*)&client_ctx, NULL);
+        qd_client = quicdoq_create(alpn, NULL, NULL, root_crt, ticket_file, token_file, quicdoq_demo_client_cb, (void*)&client_ctx, NULL);
 
         if (qd_client == NULL) {
             ret = -1;
@@ -701,7 +701,7 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
     }
 
     /* Loop: wait for packets, send queries, until all queries served */
-    while (ret == 0 && !client_ctx.all_queries_served) {
+    while (ret == 0 && !(client_ctx.all_queries_served && quicdoq_is_backlog_empty(qd_client))) {
 
         from_length = to_length = sizeof(struct sockaddr_storage);
 
@@ -767,6 +767,15 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
 
                 delta_t = picoquic_get_next_wake_delay(qclient, current_time, delay_max);
             }
+        }
+    }
+
+    if (qclient != NULL) {
+        if (picoquic_save_session_tickets(qclient, ticket_file) != 0) {
+            printf("Could not save tickets in <%s>\n", ticket_file);
+        }
+        if (picoquic_save_retry_tokens(qclient, token_file)) {
+            printf("Could not save tokens in <%s>\n", token_file);
         }
     }
 
