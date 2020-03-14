@@ -101,9 +101,6 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
 int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, quicdoq_stream_ctx_t* stream_ctx,
     void* bytes, size_t length, quicdoq_cnx_ctx_t* cnx_ctx);
 
-/* Set the parameters to the preferred DoQ values. */
-int quicdoq_set_tp(quicdoq_ctx_t* quicdoq_ctx, picoquic_cnx_t* cnx, uint64_t max_size);
-
 /* Handling of UDP relay */
 
 #define QUICDOQ_UDP_MAX_REPEAT 4

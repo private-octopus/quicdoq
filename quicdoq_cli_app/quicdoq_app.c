@@ -389,8 +389,6 @@ int quicdoq_demo_server(
     uint8_t buffer[PICOQUIC_MAX_PACKET_SIZE];
     uint8_t send_buffer[PICOQUIC_MAX_PACKET_SIZE];
     FILE* F_log = NULL;
-    char const* ticket_file = "quicdoq_client_tickets.bin";
-    char const* token_file = "quicdoq_client_tokens.bin";
 
 #ifdef _WINDOWS
     UNREFERENCED_PARAMETER(reset_seed);
@@ -442,7 +440,7 @@ int quicdoq_demo_server(
     /* Create the server context */
     if (ret == 0) {
         /* Create a Quic Doq context for the server */
-        qd_server = quicdoq_create(alpn, server_cert_file, server_key_file, NULL, ticket_file, token_file,
+        qd_server = quicdoq_create(alpn, server_cert_file, server_key_file, NULL, NULL, NULL,
             quicdoq_udp_callback, NULL, NULL);
         if (qd_server == NULL) {
             ret = -1;
