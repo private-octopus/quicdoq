@@ -35,6 +35,8 @@ int dns_query_format_test();
 int rr_name_parse_test();
 int quicdoq_basic_test();
 int quicdoq_basic_udp_test();
+int quicdoq_multi_queries_test();
+int quicdoq_multi_udp_test();
 
 #ifdef __cplusplus
 }

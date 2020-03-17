@@ -613,7 +613,8 @@ int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ct
             ret = -1;
         }
         else {
-            /* Post the data */
+            /* Mark the stream as used, update the context, post the data */
+            cnx_ctx->next_available_stream_id += 4;
             stream_ctx->query_ctx = query_ctx;
 
             ret = picoquic_mark_active_stream(cnx_ctx->cnx, stream_ctx->stream_id, 1, stream_ctx);

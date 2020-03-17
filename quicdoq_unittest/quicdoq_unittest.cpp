@@ -58,5 +58,19 @@ namespace quicdoqunittest
 
 			Assert::AreEqual(ret, 0);
 		}
+
+		TEST_METHOD(multi_queries)
+		{
+			int ret = quicdoq_multi_queries_test();
+
+			Assert::AreEqual(ret, 0);
+		}
+
+		TEST_METHOD(multi_udp)
+		{
+			int ret = quicdoq_multi_udp_test();
+
+			Assert::AreEqual(ret, 0);
+		}
 	};
 }
