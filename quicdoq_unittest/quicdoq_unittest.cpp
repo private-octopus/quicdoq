@@ -72,5 +72,19 @@ namespace quicdoqunittest
 
 			Assert::AreEqual(ret, 0);
 		}
+
+		TEST_METHOD(one_loss)
+		{
+			int ret = quicdoq_one_loss_test();
+
+			Assert::AreEqual(ret, 0);
+		}
+
+		TEST_METHOD(one_loss_udp)
+		{
+			int ret = quicdoq_one_loss_udp_test();
+
+			Assert::AreEqual(ret, 0);
+		}
 	};
 }

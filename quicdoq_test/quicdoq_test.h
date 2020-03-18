@@ -37,6 +37,8 @@ int quicdoq_basic_test();
 int quicdoq_basic_udp_test();
 int quicdoq_multi_queries_test();
 int quicdoq_multi_udp_test();
+int quicdoq_one_loss_test();
+int quicdoq_one_loss_udp_test();
 
 #ifdef __cplusplus
 }

@@ -405,6 +405,9 @@ int quicdoq_callback(picoquic_cnx_t* cnx,
         case picoquic_callback_stream_reset: /* Client reset stream #x */
         case picoquic_callback_stop_sending: /* Client asks server to reset stream #x */
             picoquic_reset_stream(cnx, stream_id, 0);
+            ret = cnx_ctx->quicdoq_ctx->app_cb_fn(quicdoq_response_cancelled,
+                cnx_ctx->quicdoq_ctx->app_cb_ctx, stream_ctx->query_ctx,
+                picoquic_get_quic_time(cnx_ctx->quicdoq_ctx->quic));
             break;
         case picoquic_callback_stateless_reset:
         case picoquic_callback_close: /* Received connection close */
@@ -643,10 +646,16 @@ int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx)
 
 int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code)
 {
-    if (quicdoq_ctx == NULL || query_ctx == NULL || error_code != 0) {
-        return -1;
+    int ret = 0;
+    if (quicdoq_ctx == NULL || query_ctx == NULL) {
+        ret = -1;
+    } else {
+        quicdoq_stream_ctx_t* stream_ctx = (quicdoq_stream_ctx_t*)query_ctx->client_cb_ctx;
+        quicdoq_cnx_ctx_t* cnx_ctx = stream_ctx->cnx_ctx;
+        ret = picoquic_reset_stream(cnx_ctx->cnx, stream_ctx->stream_id, error_code);
     }
-    return 0;
+
+    return ret;
 }
 
 int quicdoq_is_backlog_empty(quicdoq_ctx_t* quicdoq_ctx)

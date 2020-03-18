@@ -49,7 +49,9 @@ static const picoquic_test_def_t test_table[] = {
     { "basic", quicdoq_basic_test },
     { "basic_udp", quicdoq_basic_udp_test },
     { "multi_queries", quicdoq_multi_queries_test },
-    { "multi_udp", quicdoq_multi_udp_test }
+    { "multi_udp", quicdoq_multi_udp_test },
+    { "one_loss", quicdoq_one_loss_test },
+    { "quicdoq_one_loss_udp", quicdoq_one_loss_udp_test }
 };
 
 static size_t const nb_tests = sizeof(test_table) / sizeof(picoquic_test_def_t);

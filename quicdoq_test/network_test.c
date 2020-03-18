@@ -125,6 +125,8 @@ typedef struct st_quicdog_test_ctx_t {
     uint16_t next_query_id;
     uint16_t next_response_id;
     int all_query_served;
+    int some_query_inconsistent;
+    int some_query_failed;
 } quicdog_test_ctx_t;
 
 /* Server call back for tests
@@ -314,12 +316,20 @@ int quicdoq_test_client_cb(
         case quicdoq_response_complete: /* The response to the current query arrived. */
             /* tabulate completed */
             test_ctx->record[qid].is_success = 1;
+            if (!test_ctx->scenario[qid].is_success) {
+                test_ctx->some_query_inconsistent = 1;
+            }
             break;
         case quicdoq_response_cancelled: /* The response to the current query was cancelled by the peer. */
-            test_ctx->record[qid].cancel_received = 1;
             /* tabulate cancelled */
+            test_ctx->record[qid].cancel_received = 1;
+            if (test_ctx->scenario[qid].is_success) {
+                test_ctx->some_query_inconsistent = 1;
+            }
+            break;
         case quicdoq_query_failed:  /* Query failed for reasons other than cancelled. */
             /* tabulate failed */
+            test_ctx->some_query_failed = 1;
             break;
         default: /* callback code not expected on client */
             ret = -1;
@@ -592,6 +602,9 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, quicdoq_ctx_t*
     return ret;
 }
 
+/* Simulated departure of a packet towards the remote UDP server.
+ */
+
 int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
 {
     int ret = 0;
@@ -620,6 +633,9 @@ int quicdoq_test_udp_packet_prepare(quicdog_test_ctx_t* test_ctx, picoquictest_s
     return ret;
 }
 
+/* Simulated arrival of a packet from remote UDP server.
+ */
+
 int quicdoq_test_sim_udp_input(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
 {
     int ret = 0;
@@ -638,6 +654,12 @@ int quicdoq_test_sim_udp_input(quicdog_test_ctx_t* test_ctx, picoquictest_sim_li
 
     return ret;
 }
+
+/* Simulated arrival of a packet at the remote UDP server.
+ * Find the test scenario line ID by parsing the first name part as a number.
+ * If that query is meant to succeed, format a response and queue it for the specified delay.
+ * If it is meant to fail, do not format a response at all. The query should time out.
+ */
 
 int quicdoq_test_sim_udp_output(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
 {
@@ -667,20 +689,33 @@ int quicdoq_test_sim_udp_output(quicdog_test_ctx_t* test_ctx, picoquictest_sim_l
         if (ret == 0) {
             picoquictest_sim_packet_t* queued = picoquictest_sim_link_create_packet();
 
-            if (qid > test_ctx->nb_scenarios || test_ctx->record[qid].query_received || queued == NULL) {
+            if (qid > test_ctx->nb_scenarios || queued == NULL) {
                 ret = -1;
             }
             else {
-                test_ctx->record[qid].query_arrival_time = test_ctx->simulated_time + test_ctx->scenario[qid].response_delay;
-                test_ctx->record[qid].query_received = 1;
+                if (!test_ctx->record[qid].query_received) {
+                    test_ctx->record[qid].query_arrival_time = test_ctx->simulated_time + test_ctx->scenario[qid].response_delay;
+                    test_ctx->record[qid].query_received = 1;
+                }
                 *is_active = 1;
 
                 /* queue the response */
-                if (test_ctx->scenario[qid].is_success &&
-                    quicdog_test_get_format_response(packet->bytes, packet->length,
+                if (test_ctx->scenario[qid].is_success) {
+                    if (quicdog_test_get_format_response(packet->bytes, packet->length,
                         queued->bytes, PICOQUIC_MAX_PACKET_SIZE, &queued->length) == 0) {
-                    test_ctx->record[qid].queued_packet = queued;
-                    quicdoq_set_test_response_queue(test_ctx, qid);
+                        test_ctx->record[qid].queued_packet = queued;
+                        quicdoq_set_test_response_queue(test_ctx, qid);
+                    }
+                    else {
+                        DBG_PRINTF("Cannot format response to query #%d", qid);
+                        ret = -1;
+                    }
+                }
+                else {
+                    /* Simulating a non response. No packet sent if the query is meant to fail. */
+                    DBG_PRINTF("Simulating non response response to query #%d", qid);
+                    free(queued);
+                    queued = NULL;
                 }
             }
 
@@ -694,6 +729,15 @@ int quicdoq_test_sim_udp_output(quicdog_test_ctx_t* test_ctx, picoquictest_sim_l
 
     return ret;
 }
+
+/* quicdoq_test_server_sim_udp_response.
+ * simulate the responses from a remote udp server.
+ * The server manages a queue of responses, ordered by departure times.
+ * The next response to send is at location 'test_ctx->next_response_id',
+ * and there is always a packet queued for that response, unless we
+ * want to simulate a non responding server that drops responses.
+ * When there is a packet, post it to the specified link.
+ */
 
 int quicdoq_test_server_sim_udp_response(quicdog_test_ctx_t* test_ctx, picoquictest_sim_link_t* link, int* is_active)
 {
@@ -874,9 +918,10 @@ int quicdoq_test_scenario(quicdoq_test_scenario_entry_t const* scenario, size_t 
     else {
         ret = quicdoq_test_sim_run(test_ctx, time_limit);
 
-        if (ret != 0 || !test_ctx->all_query_served) {
-            DBG_PRINTF("Fail after %llu, all_served=%d, ret=%d",
-                (unsigned long long)test_ctx->simulated_time, test_ctx->all_query_served, ret);
+        if (ret != 0 || !test_ctx->all_query_served || test_ctx->some_query_failed || test_ctx->some_query_inconsistent) {
+            DBG_PRINTF("Fail after %llu, all_served=%d (inconsistent=%d, failed=%d), ret=%d",
+                (unsigned long long)test_ctx->simulated_time, test_ctx->all_query_served,
+                test_ctx->some_query_inconsistent, test_ctx->some_query_failed, ret);
             ret = -1;
         }
         quicdoq_test_ctx_delete(test_ctx);
@@ -909,4 +954,19 @@ int quicdoq_multi_queries_test()
 int quicdoq_multi_udp_test()
 {
     return quicdoq_test_scenario(multi_queries_scenario, sizeof(multi_queries_scenario), 1, 3000000);
+}
+
+/* One loss scenario: one query, immediate negative response */
+static quicdoq_test_scenario_entry_t const one_loss_scenario[] = {
+    { 0, 0, 0 }
+};
+
+int quicdoq_one_loss_test()
+{
+    return quicdoq_test_scenario(one_loss_scenario, sizeof(one_loss_scenario), 0, 3000000);
+}
+
+int quicdoq_one_loss_udp_test()
+{
+    return quicdoq_test_scenario(one_loss_scenario, sizeof(one_loss_scenario), 1, 10000000);
 }
