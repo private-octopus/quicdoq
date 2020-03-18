@@ -903,10 +903,10 @@ static quicdoq_test_scenario_entry_t const multi_queries_scenario[] = {
 
 int quicdoq_multi_queries_test()
 {
-    return quicdoq_test_scenario(basic_scenario, sizeof(multi_queries_scenario), 0, 3000000);
+    return quicdoq_test_scenario(multi_queries_scenario, sizeof(multi_queries_scenario), 0, 3000000);
 }
 
 int quicdoq_multi_udp_test()
 {
-    return quicdoq_test_scenario(basic_scenario, sizeof(multi_queries_scenario), 1, 3000000);
+    return quicdoq_test_scenario(multi_queries_scenario, sizeof(multi_queries_scenario), 1, 3000000);
 }
