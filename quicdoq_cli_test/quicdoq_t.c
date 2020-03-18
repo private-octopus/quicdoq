@@ -47,7 +47,9 @@ static const picoquic_test_def_t test_table[] = {
     { "dns_query_format", dns_query_format_test },
     { "rr_name_parse", rr_name_parse_test },
     { "basic", quicdoq_basic_test },
-    { "basic_udp", quicdoq_basic_udp_test }
+    { "basic_udp", quicdoq_basic_udp_test },
+    { "multi_queries", quicdoq_multi_queries_test },
+    { "multi_udp", quicdoq_multi_udp_test }
 };
 
 static size_t const nb_tests = sizeof(test_table) / sizeof(picoquic_test_def_t);
