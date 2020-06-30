@@ -577,7 +577,7 @@ int quicdoq_test_sim_packet_prepare(quicdog_test_ctx_t* test_ctx, quicdoq_ctx_t*
 
         ret = picoquic_prepare_next_packet(quicdoq_ctx->quic, test_ctx->simulated_time,
             packet->bytes, PICOQUIC_MAX_PACKET_SIZE, &packet->length,
-            &packet->addr_to, &packet->addr_from, &if_index);
+            &packet->addr_to, &packet->addr_from, &if_index, NULL);
 
         if (ret != 0)
         {
