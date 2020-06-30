@@ -170,7 +170,7 @@ extern "C" {
     typedef struct st_quicdoq_ctx_t quicdoq_ctx_t;
     quicdoq_ctx_t* quicdoq_create(char const * alpn,
         char const* cert_file_name, char const* key_file_name, char const* cert_root_file_name,
-        char* ticket_store_file_name, char* token_store_file_name,
+        char const* ticket_store_file_name, char const* token_store_file_name,
         quicdoq_app_cb_fn app_cb_fn, void * app_cb_ctx,
         uint64_t* simulated_time);
     void quicdoq_delete(quicdoq_ctx_t* ctx);
