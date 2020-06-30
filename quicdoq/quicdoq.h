@@ -118,10 +118,16 @@ extern "C" {
 #define QUICDOQ_PORT 864
 
 /* DoQ error codes */
-#define QUICDOQ_ERROR_INTERNAL 0x201
+#define QUICDOQ_ERROR_NO_ERROR 0x00
+#define QUICDOQ_ERROR_INTERNAL 0x01
+#define QUICDOQ_ERROR_PROTOCOL 0x02
+
 #define QUICDOQ_ERROR_RESPONSE_TOO_LONG 0x202
 #define QUICDOQ_ERROR_RESPONSE_TIME_OUT 0x203
 #define QUICDOQ_ERROR_QUERY_TOO_LONG 0x204
+
+/* Max stream size, per draft */
+#define QUICDOQ_MAX_STREAM_DATA 0xffff
 
 /* Doq client return codes
  */
@@ -199,7 +205,7 @@ extern "C" {
 
     int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx);
 
-    int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code);
+    int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint16_t error_code);
 
     int quicdoq_is_backlog_empty(quicdoq_ctx_t* quicdoq_ctx);
 

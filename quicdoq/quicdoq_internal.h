@@ -101,8 +101,13 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
 int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, quicdoq_stream_ctx_t* stream_ctx,
     void* bytes, size_t length, quicdoq_cnx_ctx_t* cnx_ctx);
 
-/* Set the parameters to the preferred DoQ values. */
-int quicdoq_set_tp(quicdoq_ctx_t* quicdoq_ctx, picoquic_cnx_t* cnx, uint64_t max_size);
+/* Set the parameters to the preferred DoQ values for the client */
+void quicdoq_set_tp(picoquic_cnx_t* cnx);
+/* Set default transport parameters to adequate value for quicdoq server. */
+int quicdoq_set_default_tp(quicdoq_ctx_t* quicdoq_ctx);
+
+/* Verify that transport parameters have the expected value */
+int quicdoq_check_tp(quicdoq_cnx_ctx_t* cnx_ctx, picoquic_cnx_t* cnx);
 
 /* Handling of UDP relay */
 

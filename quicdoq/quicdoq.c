@@ -349,9 +349,7 @@ quicdoq_cnx_ctx_t* quicdoq_create_client_cnx(quicdoq_ctx_t* quicdoq_ctx, char co
             cnx_ctx->sni = picoquic_string_duplicate(sni);
             picoquic_set_callback(cnx, quicdoq_callback, cnx_ctx);
 
-            if (quicdoq_set_tp(quicdoq_ctx, cnx, 2048) != 0) {
-                DBG_PRINTF("%s", "Cannot set parameters for client connection");
-            }
+            quicdoq_set_tp(cnx);
 
             if (picoquic_start_client_cnx(cnx) != 0) {
                 picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
@@ -425,6 +423,10 @@ int quicdoq_callback(picoquic_cnx_t* cnx,
         case picoquic_callback_almost_ready:
         case picoquic_callback_ready:
             /* Check that the transport parameters are what DoQ expects */
+            if (quicdoq_check_tp(cnx_ctx, cnx) != 0) {
+                (void)picoquic_close(cnx, QUICDOQ_ERROR_PROTOCOL);
+            }
+            break;
         case picoquic_callback_datagram:/* No datagram support in DoQ */
             break;
         case picoquic_callback_version_negotiation:
@@ -478,21 +480,17 @@ void  quicdoq_delete_query_ctx(quicdoq_query_ctx_t* query_ctx)
 
 /* Set transport parameters to adequate value for quicdoq server.
  */
-int quicdoq_set_tp(quicdoq_ctx_t* quicdoq_ctx, picoquic_cnx_t * cnx, uint64_t max_size)
+int quicdoq_set_default_tp(quicdoq_ctx_t* quicdoq_ctx)
 {
     int ret = 0;
     picoquic_tp_t tp;
     memset(&tp, 0, sizeof(picoquic_tp_t));
-    if (cnx == NULL) {
-        tp.initial_max_stream_data_bidi_local = max_size;
-        tp.initial_max_stream_data_bidi_remote = max_size;
-        tp.initial_max_stream_id_bidir = 256;
-    }
-    else {
-        tp.initial_max_stream_data_bidi_local = 0;
-        tp.initial_max_stream_data_bidi_remote = max_size;
-        tp.initial_max_stream_id_bidir = 0;
-    }
+    /* This is a server context. The "remote" bidi streams are those
+        * initiated by the client, and should be authorized to send
+        * a 64K-1 packet */
+    tp.initial_max_stream_data_bidi_local = 0;
+    tp.initial_max_stream_data_bidi_remote = QUICDOQ_MAX_STREAM_DATA;
+    tp.initial_max_stream_id_bidir = 256;
     tp.initial_max_stream_data_uni = 0;
     tp.initial_max_data = 0x10000;
     tp.initial_max_stream_id_unidir = 0;
@@ -505,6 +503,54 @@ int quicdoq_set_tp(quicdoq_ctx_t* quicdoq_ctx, picoquic_cnx_t * cnx, uint64_t ma
     /* tp.prefered_address: todo, consider use of preferred address for anycast server */
     /* all optional parameters set to zero */
     ret = picoquic_set_default_tp(quicdoq_ctx->quic, &tp);
+    return ret;
+}
+
+/* Set transport parameters to adequate value for quicdoq client.
+ */
+void quicdoq_set_tp(picoquic_cnx_t * cnx)
+{
+    picoquic_tp_t tp;
+    memset(&tp, 0, sizeof(picoquic_tp_t));
+    /* This is a client context. The "local" bidi streams are those
+        * initiated by the client, and the server should be authorized to send
+        * a 64K-1 packet */
+    tp.initial_max_stream_data_bidi_local = QUICDOQ_MAX_STREAM_DATA;
+    tp.initial_max_stream_data_bidi_remote = 0;
+    tp.initial_max_stream_id_bidir = 0;
+    tp.initial_max_stream_data_uni = 0;
+    tp.initial_max_data = 0x10000;
+    tp.initial_max_stream_id_unidir = 0;
+    tp.idle_timeout = 20000;
+    tp.max_packet_size = 1232;
+    tp.max_ack_delay = 10000;
+    tp.active_connection_id_limit = 3;
+    tp.ack_delay_exponent = 3;
+    tp.migration_disabled = 0;
+    /* tp.prefered_address: todo, consider use of preferred address for anycast server */
+    /* all optional parameters set to zero */
+    picoquic_set_transport_parameters(cnx, &tp);
+}
+
+/* Verify that transport parameters have the expected value */
+int quicdoq_check_tp(quicdoq_cnx_ctx_t* cnx_ctx, picoquic_cnx_t* cnx)
+{
+    int ret = 0;
+    picoquic_tp_t const* tp = picoquic_get_transport_parameters(cnx, 0);
+
+    if (cnx_ctx->is_server) {
+        if (tp->initial_max_stream_data_bidi_local != QUICDOQ_MAX_STREAM_DATA)
+        {
+            ret = -1;
+        }
+    }
+    else {
+        if (tp->initial_max_stream_data_bidi_remote != QUICDOQ_MAX_STREAM_DATA)
+        {
+            ret = -1;
+        }
+    }
+
     return ret;
 }
 
@@ -543,7 +589,7 @@ quicdoq_ctx_t * quicdoq_create(char const * alpn,
             quicdoq_ctx = NULL;
         }
         else {
-            if (quicdoq_set_tp(quicdoq_ctx, NULL, 2048) != 0) {
+            if (quicdoq_set_default_tp(quicdoq_ctx) != 0) {
                 DBG_PRINTF("%s", "Could not set default transport parameters.");
             }
             /* Load the tokens if present. */
@@ -644,7 +690,7 @@ int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx)
     return picoquic_mark_active_stream(cnx_ctx->cnx, stream_ctx->stream_id, 1, stream_ctx);
 }
 
-int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint64_t error_code)
+int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint16_t error_code)
 {
     int ret = 0;
     if (quicdoq_ctx == NULL || query_ctx == NULL) {
