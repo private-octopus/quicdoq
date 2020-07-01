@@ -107,7 +107,7 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
             }
             else {
                 /* If this is a server stream, allocate a query structure */
-                stream_ctx->query_ctx = quicdoq_create_query_ctx(1024, 4096);
+                stream_ctx->query_ctx = quicdoq_create_query_ctx(QUICDOQ_MAX_STREAM_DATA, QUICDOQ_MAX_STREAM_DATA);
                 if (stream_ctx->query_ctx == NULL) {
                     picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                     DBG_PRINTF("Cannot create query context for server stream  #%llu", (unsigned long long)stream_id);
@@ -122,6 +122,8 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
                     stream_ctx->query_ctx->client_cb_ctx = stream_ctx;
                     stream_ctx->query_ctx->quic = picoquic_get_quic_ctx(cnx);
                     stream_ctx->query_ctx->cid = picoquic_get_logging_cnxid(cnx);
+                    stream_ctx->query_ctx->query_id = cnx_ctx->quicdoq_ctx->next_query_id++;
+                    stream_ctx->query_ctx->stream_id = stream_ctx->stream_id;
                 }
             }
         }
@@ -139,10 +141,15 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
                 stream_ctx->query_ctx->query_length += (uint16_t)length;
 
                 if (fin_or_event == picoquic_callback_stream_fin) {
-                    /* Query has arrived, apply the call back */
-                    ret = cnx_ctx->quicdoq_ctx->app_cb_fn(quicdoq_incoming_query,
-                        cnx_ctx->quicdoq_ctx->app_cb_ctx, stream_ctx->query_ctx,
-                        picoquic_get_quic_time(cnx_ctx->quicdoq_ctx->quic));
+                    /* Query has arrived, verify and then apply the call back */
+                    if (stream_ctx->query_ctx->query_length < 2 || stream_ctx->query_ctx->query[0] != 0 || stream_ctx->query_ctx->query[1] != 0) {
+                        ret = picoquic_close(cnx, QUICDOQ_ERROR_PROTOCOL);
+                    }
+                    else {
+                        ret = cnx_ctx->quicdoq_ctx->app_cb_fn(quicdoq_incoming_query,
+                            cnx_ctx->quicdoq_ctx->app_cb_ctx, stream_ctx->query_ctx,
+                            picoquic_get_quic_time(cnx_ctx->quicdoq_ctx->quic));
+                    }
                 }
             }
         }
@@ -648,10 +655,6 @@ int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ct
         if (cnx_ctx == NULL) {
             ret = -1;
         }
-        else {
-            query_ctx->quic = quicdoq_ctx->quic;
-            query_ctx->cid = picoquic_get_logging_cnxid(cnx_ctx->cnx);
-        }
     }
 
     if (ret == 0) {
@@ -665,6 +668,10 @@ int quicdoq_post_query(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ct
             /* Mark the stream as used, update the context, post the data */
             cnx_ctx->next_available_stream_id += 4;
             stream_ctx->query_ctx = query_ctx;
+            query_ctx->stream_id = stream_ctx->stream_id;
+            query_ctx->cid = picoquic_get_logging_cnxid(cnx_ctx->cnx);
+            query_ctx->quic = quicdoq_ctx->quic;
+
 
             ret = picoquic_mark_active_stream(cnx_ctx->cnx, stream_ctx->stream_id, 1, stream_ctx);
         }

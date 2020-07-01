@@ -70,6 +70,7 @@ typedef struct st_quicdoq_ctx_t {
     quicdoq_cnx_ctx_t default_callback_ctx; /* Default context provided to new connections */
     struct st_quicdoq_cnx_ctx_t* first_cnx; /* First in double linked list of open connections in this context */
     struct st_quicdoq_cnx_ctx_t* last_cnx; /* last in list of open connections in this context */
+    uint64_t next_query_id; /* Assign a unique ID to each new context */
 } quicdoq_ctx_t;
 
 /* DoQ stream handling */

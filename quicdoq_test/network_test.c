@@ -93,6 +93,8 @@ typedef struct st_quicdoq_test_scenario_record_t {
     uint64_t response_arrival_time;
     quicdoq_query_ctx_t* queued_response;
     picoquictest_sim_packet_t* queued_packet;
+    picoquic_connection_id_t cid; /* ID of the connection over which the query was sent. */
+    uint64_t stream_id; /* ID of the stream on which the query is mapped. */
     int query_sent;
     int query_received;
     int server_error;
@@ -129,14 +131,15 @@ typedef struct st_quicdog_test_ctx_t {
     int some_query_failed;
 } quicdog_test_ctx_t;
 
-/* Server call back for tests
- */
-uint16_t quicdog_test_get_query_id(quicdoq_query_ctx_t* query_ctx)
+/* Server call back for tests */
+uint16_t quicdog_test_get_query_id_by_stream_id(quicdoq_query_ctx_t* query_ctx, quicdog_test_ctx_t * test_ctx)
 {
-    uint16_t qid = UINT16_MAX;
-
-    if (query_ctx != NULL && query_ctx->query != NULL && query_ctx->query_length >= 2) {
-        qid = (query_ctx->query[0] << 8) | query_ctx->query[1];
+    uint16_t qid = 0;
+    for (; qid < test_ctx->nb_scenarios; qid++) {
+        if (picoquic_compare_connection_id(&test_ctx->record[qid].cid, &query_ctx->cid) == 0 &&
+            test_ctx->record[qid].stream_id == query_ctx->stream_id) {
+            break;
+        }
     }
 
     return qid;
@@ -222,7 +225,7 @@ int quicdoq_test_server_cb(
 {
     int ret = 0;
     quicdog_test_ctx_t* test_ctx = (quicdog_test_ctx_t*)callback_ctx;
-    uint16_t qid = quicdog_test_get_query_id(query_ctx);
+    uint16_t qid = quicdog_test_get_query_id_by_stream_id(query_ctx, test_ctx);
 
     switch (callback_code) {
     case quicdoq_incoming_query: /* Incoming callback query */
@@ -301,7 +304,7 @@ int quicdoq_test_client_cb(
 {
     int ret = 0;
     quicdog_test_ctx_t* test_ctx = (quicdog_test_ctx_t*)callback_ctx;
-    uint16_t qid = quicdog_test_get_query_id(query_ctx);
+    uint16_t qid = (uint16_t)query_ctx->query_id;
 
     if (qid > test_ctx->nb_scenarios) {
         ret = -1;
@@ -367,7 +370,7 @@ int quicdoq_test_client_submit_query(quicdog_test_ctx_t* test_ctx)
     }
     else {
         /* create a query record */
-        query_ctx = quicdoq_create_query_ctx(512, 1024);
+        query_ctx = quicdoq_create_query_ctx(QUICDOQ_MAX_STREAM_DATA, QUICDOQ_MAX_STREAM_DATA);
     }
 
     if (query_ctx == NULL) {
@@ -382,11 +385,12 @@ int quicdoq_test_client_submit_query(quicdog_test_ctx_t* test_ctx)
         uint8_t* qbuf_max = query_ctx->query + query_ctx->query_max_size;
 
         (void)picoquic_sprintf(name_buf, sizeof(name_buf), &name_length, "%d.example.com", test_ctx->next_query_id);
-        qbuf = quicdog_format_dns_query(qbuf, qbuf_max, name_buf, test_ctx->next_query_id, 0, 1, query_ctx->response_max_size);
+        qbuf = quicdog_format_dns_query(qbuf, qbuf_max, name_buf, 0, 0, 1, query_ctx->response_max_size);
         if (qbuf == NULL) {
             ret = -1;
         }
         else {
+            query_ctx->query_id = test_ctx->next_query_id;
             query_ctx->query_length = (uint16_t)(qbuf - query_ctx->query);
 
             query_ctx->server_name = PICOQUIC_TEST_SNI;
@@ -396,6 +400,10 @@ int quicdoq_test_client_submit_query(quicdog_test_ctx_t* test_ctx)
             query_ctx->client_cb_ctx = test_ctx;
 
             ret = quicdoq_post_query(test_ctx->qd_client, query_ctx);
+            test_ctx->record[test_ctx->next_query_id].cid = query_ctx->cid;
+            test_ctx->record[test_ctx->next_query_id].stream_id = query_ctx->stream_id;
+            test_ctx->record[test_ctx->next_query_id].query_sent_time = test_ctx->simulated_time;
+            test_ctx->record[test_ctx->next_query_id].query_sent = 1;
         }
     }
 

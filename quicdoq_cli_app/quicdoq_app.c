@@ -857,7 +857,7 @@ int quicdoq_demo_client_init_context(quicdoq_ctx_t* qd_client, quicdoq_demo_clie
         memset(client_ctx->is_query_complete, 0, sizeof(int) * nb_client_queries);
 
         for (int i = 0; ret == 0 && i < nb_client_queries; i++) {
-            client_ctx->query_ctx[i] = quicdoq_create_query_ctx(1536, 1536);
+            client_ctx->query_ctx[i] = quicdoq_create_query_ctx(QUICDOQ_MAX_STREAM_DATA, QUICDOQ_MAX_STREAM_DATA);
             if (client_ctx->query_ctx[i] == NULL) {
                 ret = -1;
             }
@@ -924,7 +924,7 @@ int quicdoq_demo_client_cb(
 {
     int ret = 0;
     quicdoq_demo_client_ctx_t* client_ctx = (quicdoq_demo_client_ctx_t*)callback_ctx;
-    uint16_t qid = query_ctx->query_id;
+    uint16_t qid = (uint16_t) query_ctx->query_id;
 
     if (qid > client_ctx->nb_client_queries) {
         ret = -1;

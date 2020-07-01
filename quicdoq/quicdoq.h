@@ -156,8 +156,9 @@ extern "C" {
         struct sockaddr* server_addr; /* Address of the target server */
         struct sockaddr* client_addr; /* Address of the client if known connection */
         picoquic_quic_t* quic; /* Quic context for logging */
-        picoquic_connection_id_t cid;
-        uint16_t query_id; /* Unique ID of the query, assigned by the client */
+        picoquic_connection_id_t cid; /* ID of the connection over which the query was sent. */
+        uint64_t stream_id; /* ID of the stream on which the query is mapped. */
+        uint64_t query_id; /* Unique ID of the query, assigned by the client */
         uint8_t* query; /* buffer holding the query */
         uint16_t query_max_size; /* length of the query */
         uint16_t query_length; /* length of the query */
