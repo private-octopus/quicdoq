@@ -70,6 +70,7 @@ typedef struct st_quicdoq_ctx_t {
     quicdoq_cnx_ctx_t default_callback_ctx; /* Default context provided to new connections */
     struct st_quicdoq_cnx_ctx_t* first_cnx; /* First in double linked list of open connections in this context */
     struct st_quicdoq_cnx_ctx_t* last_cnx; /* last in list of open connections in this context */
+    uint64_t next_query_id; /* Assign a unique ID to each new context */
 } quicdoq_ctx_t;
 
 /* DoQ stream handling */
@@ -101,8 +102,13 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
 int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, quicdoq_stream_ctx_t* stream_ctx,
     void* bytes, size_t length, quicdoq_cnx_ctx_t* cnx_ctx);
 
-/* Set the parameters to the preferred DoQ values. */
-int quicdoq_set_tp(quicdoq_ctx_t* quicdoq_ctx, picoquic_cnx_t* cnx, uint64_t max_size);
+/* Set the parameters to the preferred DoQ values for the client */
+void quicdoq_set_tp(picoquic_cnx_t* cnx);
+/* Set default transport parameters to adequate value for quicdoq server. */
+int quicdoq_set_default_tp(quicdoq_ctx_t* quicdoq_ctx);
+
+/* Verify that transport parameters have the expected value */
+int quicdoq_check_tp(quicdoq_cnx_ctx_t* cnx_ctx, picoquic_cnx_t* cnx);
 
 /* Handling of UDP relay */
 

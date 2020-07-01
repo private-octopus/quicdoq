@@ -106,7 +106,7 @@ void quicdoq_udp_reinsert_in_list(quicdoq_udp_ctx_t* udp_ctx, quicdog_udp_queued
     quicdoq_udp_insert_in_list(udp_ctx, quq_ctx);
 }
 
-int quicdoq_udp_cancel_query(quicdoq_udp_ctx_t* udp_ctx, quicdog_udp_queued_t* quq_ctx, uint64_t error_code)
+int quicdoq_udp_cancel_query(quicdoq_udp_ctx_t* udp_ctx, quicdog_udp_queued_t* quq_ctx, uint16_t error_code)
 {
     int ret = quicdoq_cancel_response(udp_ctx->quicdoq_ctx, quq_ctx->query_ctx, error_code);
     /* Remove the context from the list and delete it */
