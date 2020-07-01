@@ -114,8 +114,8 @@ extern "C" {
 #endif
 
 /* DoQ ALPN and DoQ port -- as defined in draft */
-#define QUICDOQ_ALPN "doq-h00"
-#define QUICDOQ_PORT 864
+#define QUICDOQ_ALPN "doq-i00"
+#define QUICDOQ_PORT 784
 
 /* DoQ error codes */
 #define QUICDOQ_ERROR_NO_ERROR 0x00
