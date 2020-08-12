@@ -100,18 +100,16 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
             /* Incoming data, server size, requires a context creation */
             stream_ctx = quicdoq_find_or_create_stream(stream_id, cnx_ctx, 1);
             if (stream_ctx == NULL) {
-                picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                 DBG_PRINTF("Cannot create server context for server stream  #%llu", (unsigned long long)stream_id);
-                picoquic_log_app_message(picoquic_get_quic_ctx(cnx), &cid, "Quicdoq: Cannot create server context for server stream  #%llu.\n", (unsigned long long)stream_id);
+                picoquic_log_app_message(cnx, "Quicdoq: Cannot create server context for server stream  #%llu.\n", (unsigned long long)stream_id);
                 ret = -1;
             }
             else {
                 /* If this is a server stream, allocate a query structure */
                 stream_ctx->query_ctx = quicdoq_create_query_ctx(QUICDOQ_MAX_STREAM_DATA, QUICDOQ_MAX_STREAM_DATA);
                 if (stream_ctx->query_ctx == NULL) {
-                    picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                     DBG_PRINTF("Cannot create query context for server stream  #%llu", (unsigned long long)stream_id);
-                    picoquic_log_app_message(picoquic_get_quic_ctx(cnx), &cid, "Quicdoq: Cannot create query context for server stream  #%llu\n", (unsigned long long)stream_id);
+                    picoquic_log_app_message(cnx, "Quicdoq: Cannot create query context for server stream  #%llu\n", (unsigned long long)stream_id);
                     quicdoq_delete_stream_ctx(cnx_ctx, stream_ctx);
                     ret = -1;
                 }
@@ -131,7 +129,7 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
         if (ret == 0) {
             if (stream_ctx->query_ctx->query_length + length > stream_ctx->query_ctx->query_max_size){
                 DBG_PRINTF("Incoming query too long for server stream  #%llu", (unsigned long long)stream_id);
-                picoquic_log_app_message(stream_ctx->query_ctx->quic, &stream_ctx->query_ctx->cid, "Quicdoq: Incoming query too long for server stream  #%llu.\n", (unsigned long long)stream_id);
+                picoquic_log_app_message(cnx, "Quicdoq: Incoming query too long for server stream  #%llu.\n", (unsigned long long)stream_id);
                 ret = -1;
             }
             else {
@@ -156,15 +154,14 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
     }
     else {
         if (stream_ctx == NULL) {
-            picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
             DBG_PRINTF("Data arrived on client stream  #%llu before context creation", (unsigned long long)stream_id);
-            picoquic_log_app_message(picoquic_get_quic_ctx(cnx), &cid, "Quicdoq: Data arrived on client stream  #%llu before context creation.\n", (unsigned long long)stream_id);
+            picoquic_log_app_message(cnx, "Quicdoq: Data arrived on client stream  #%llu before context creation.\n", (unsigned long long)stream_id);
             ret = -1;
         }
         else {
             if (stream_ctx->query_ctx->response_length + length > stream_ctx->query_ctx->response_max_size) {
                 DBG_PRINTF("Incoming response too long for client stream  #%llu", (unsigned long long)stream_id);
-                picoquic_log_app_message(stream_ctx->query_ctx->quic, &stream_ctx->query_ctx->cid, "Quicdoq: Incoming response too long for client stream  #%llu.\n", (unsigned long long)stream_id);
+                picoquic_log_app_message(cnx, "Quicdoq: Incoming response too long for client stream  #%llu.\n", (unsigned long long)stream_id);
                 ret = -1;
             }
             else {
@@ -359,9 +356,8 @@ quicdoq_cnx_ctx_t* quicdoq_create_client_cnx(quicdoq_ctx_t* quicdoq_ctx, char co
             quicdoq_set_tp(cnx);
 
             if (picoquic_start_client_cnx(cnx) != 0) {
-                picoquic_connection_id_t cid = picoquic_get_logging_cnxid(cnx);
                 DBG_PRINTF("Could not start the connection to %s", sni);
-                picoquic_log_app_message(quicdoq_ctx->quic, &cid, "Quicdoq: Could not start the connection to %s.\n", (sni == NULL)?"<NULL>":sni);
+                picoquic_log_app_message(cnx, "Quicdoq: Could not start the connection to %s.\n", (sni == NULL)?"<NULL>":sni);
                 /* TODO: proper error handling */
             }
         }
@@ -692,7 +688,7 @@ int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx)
 {
     quicdoq_stream_ctx_t* stream_ctx = (quicdoq_stream_ctx_t*)query_ctx->client_cb_ctx;
     quicdoq_cnx_ctx_t* cnx_ctx = stream_ctx->cnx_ctx;
-    picoquic_log_app_message(query_ctx->quic, &query_ctx->cid, "Response #%d received at cnx time: %"PRIu64 "us.\n", query_ctx->query_id, 
+    picoquic_log_app_message(cnx_ctx->cnx, "Response #%d received at cnx time: %"PRIu64 "us.\n", query_ctx->query_id, 
         picoquic_get_quic_time(query_ctx->quic) - picoquic_get_cnx_start_time(cnx_ctx->cnx));
     return picoquic_mark_active_stream(cnx_ctx->cnx, stream_ctx->stream_id, 1, stream_ctx);
 }

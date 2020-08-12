@@ -202,12 +202,10 @@ void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
     } else {
         if (quq_ctx->nb_sent > QUICDOQ_UDP_MAX_REPEAT) {
             /* Query failed. Delete, report failure */
-            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: Cancel after max repeat, udp query #%d.\n", quq_ctx->udp_query_id);
             (void)quicdoq_udp_cancel_query(udp_ctx, quq_ctx, QUICDOQ_ERROR_RESPONSE_TIME_OUT);
         }
         else if (quq_ctx->query_ctx->query_length > send_buffer_max) {
             /* Cannot be sent. Delete, send back a query too long failure */
-            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: Response too long, udp query #%d.\n", quq_ctx->udp_query_id);
             (void)quicdoq_udp_cancel_query(udp_ctx, quq_ctx, QUICDOQ_ERROR_QUERY_TOO_LONG);
         }
         else {
@@ -217,8 +215,6 @@ void quicdoq_udp_prepare_next_packet(quicdoq_udp_ctx_t* udp_ctx,
             *send_length = quq_ctx->query_ctx->query_length;
 
             quq_ctx->nb_sent++;
-            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: preparing UDP query #%d after %"PRIu64 "us.\n", 
-                quq_ctx->udp_query_id, current_time - quq_ctx->query_arrival_time);
             quq_ctx->next_send_time = current_time + udp_ctx->rto;
             quicdoq_udp_reinsert_in_list(udp_ctx, quq_ctx);
             picoquic_store_addr(p_addr_to, (struct sockaddr*)&udp_ctx->udp_addr);
@@ -238,6 +234,9 @@ void quicdoq_udp_incoming_packet(
     int if_index_to,
     uint64_t current_time)
 {
+#ifdef _WINDOWS
+    UNREFERENCED_PARAMETER(current_time);
+#endif
     if (length < 2) {
         /* Bad packet */
     }
@@ -250,7 +249,6 @@ void quicdoq_udp_incoming_packet(
         }
         else if (length > quq_ctx->query_ctx->response_max_size) {
             /* Reponse is too long */
-            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: incoming UDP response too long, query  #%d.\n", quq_ctx->udp_query_id);
             (void)quicdoq_udp_cancel_query(udp_ctx, quq_ctx, QUICDOQ_ERROR_RESPONSE_TOO_LONG);
         }
         else
@@ -265,8 +263,6 @@ void quicdoq_udp_incoming_packet(
             memcpy(quq_ctx->query_ctx->response + 2, bytes + 2, length - 2);
             quq_ctx->query_ctx->response_length = length;
             /* Post to the quicdoq server */
-            picoquic_log_app_message(quq_ctx->query_ctx->quic, &quq_ctx->query_ctx->cid, "Quicdoq: incoming UDP to query #%d after %"PRIu64 "us. Posted to Quicdoq server.\n", 
-                quq_ctx->udp_query_id, current_time - quq_ctx->query_arrival_time);
             (void)quicdoq_post_response(quq_ctx->query_ctx);
             /* Remove the context from the list and delete it */
             quicdoq_udp_remove_from_list(udp_ctx, quq_ctx);

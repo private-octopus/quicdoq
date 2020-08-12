@@ -560,7 +560,7 @@ int quicdoq_demo_server(
                 if (send_length == 0 && picoquic_get_next_wake_time(quicdoq_get_quic_ctx(qd_server), current_time) <= current_time) {
                     ret = picoquic_prepare_next_packet(quicdoq_get_quic_ctx(qd_server), loop_time,
                         send_buffer, sizeof(send_buffer), &send_length,
-                        &peer_addr, &local_addr, &if_index, NULL);
+                        &peer_addr, &local_addr, &if_index, NULL, NULL);
                 }
 
                 if (ret == 0 && send_length > 0) {
@@ -730,7 +730,7 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
 
                 ret = picoquic_prepare_next_packet(qclient, current_time,
                     send_buffer, PICOQUIC_MAX_PACKET_SIZE, &send_length,
-                    &packet_to, &packet_from, &x_if_index_to, NULL);
+                    &packet_to, &packet_from, &x_if_index_to, NULL, NULL);
 
                 if (ret == 0 && send_length > 0) {
                     bytes_sent = sendto(fd, (const char*)send_buffer, (int)send_length, 0,
@@ -905,7 +905,7 @@ void quicdoq_demo_print_response(quicdoq_query_ctx_t* query_ctx)
         (uint8_t*)query_out + sizeof(query_out));
 
     if (text_start == NULL) {
-        fprintf(stdout, "Could not parse the response to query #%d\n", query_ctx->query_id);
+        fprintf(stdout, "Could not parse the response to query #%" PRIu64 "\n", query_ctx->query_id);
     }
     else {
         *text_start = 0;
