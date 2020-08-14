@@ -326,7 +326,7 @@ void usage()
 
     fprintf(stderr, "\nIn client mode, the scenario provides the list of names to be resolved\n");
     fprintf(stderr, "and the record type, e.g.:\n");
-    fprintf(stderr, "   www.example:A www.example.example:AAAA example.net:NS");
+    fprintf(stderr, "   www.example:A www.example.example:AAAA example.net:NS\n");
     fprintf(stderr, "If no scenario is specified, the client looks for example.com:A.\n");
     fprintf(stderr, "\nIn server mode, the queries are sent over UDP to the backend DNS server\n");
     fprintf(stderr, "specified in the -d argument.\n");

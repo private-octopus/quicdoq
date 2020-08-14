@@ -78,3 +78,47 @@ Same build steps as Linux.
 ## Picoquic on FreeBSD
 
 Same build steps as Linux.
+
+# Running the demo application
+
+This distribution includes a demo application, which is meant to illustrate the usage of
+the API. 
+
+```
+    +------------+      +-------------------+
+    | Client CLI |      | Relay server      |
+    +------------+      +---------+---------+      +-----------+
+    | Quicdoq    |      | Quicdoq | Stub    |      | Recursive |
+    +------------+      +---------+ DNS     |      | DNS 
+    | Quic       |      | Quic    | resolver|      | Resolver  |
+    +------------+      +---------+---------+      +-----------+     
+    | UDP        |<---->| UDP     | UDP     |<---->| UDP       |
+    +------------+      +---------+---------+      +-----------+ 
+```
+The demo client has a simple command line interface:
+```
+quicdoq_app <options> [server_name [port [scenario]]]
+```
+The scenario consists of a set of dns queries, e.g.:
+```
+www.example:A www.example.example:AAAA example.net:NS
+```
+The client will set up a DNS over QUIC connection to the specified server,
+send the queries, wait for responses and display these responses.
+
+The server receives the DNS queries from the DNS over QUIC stack, and passes
+them to a "relay server" which simply forwards them to a designated
+recursive resolver. The responses will be relayed back to the client
+using DNS over QUIC.
+
+The server also has a simple command line interface:
+```
+quicdoq_app <options> -p port -d dns-server
+```
+The DNS server is designated by its IP address, such as `8.8.8.8`.
+The options for client and server can be displayed with the command
+```
+quicdoq_app -h
+```
+
+
