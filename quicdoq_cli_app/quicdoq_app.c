@@ -35,6 +35,7 @@
 #include "picosocks.h"
 #include "picoquic_utils.h"
 #include "quicdoq.h"
+#include "autoqlog.h"
 
 #define SERVER_CERT_FILE "certs\\cert.pem"
 #define SERVER_KEY_FILE  "certs\\key.pem"
@@ -64,6 +65,7 @@
 #include "picoquic_utils.h"
 #include "quicdoq.h"
 #include "picosocks.h"
+#include "autoqlog.h"
 
 #if 0
 #ifndef SOCKET_TYPE
@@ -102,12 +104,12 @@ uint32_t parse_target_version(char const* v_arg);
 int quicdoq_demo_server(
     const char* alpn, const char* server_cert_file, const char* server_key_file,
     const char* esni_key_file, const char* esni_rr_file, const char* log_file,
-    const char* bin_file, const char* backend_dns_server, const char* solution_dir,
+    const char* binlog_dir, char const* qlog_dir, const char* backend_dns_server, const char* solution_dir,
     int use_long_log, int server_port, int dest_if, int mtu_max, int do_retry,
     uint64_t* reset_seed, char const* cc_algo_id);
 int quicdoq_client(const char* server_name, int server_port, int dest_if,
     const char* sni, const char* esni_rr_file, const char* alpn, const char* root_crt,
-    int mtu_max, const char* log_file, char const* bin_file, int use_long_log,
+    int mtu_max, const char* log_file, char const* binlog_dir, char const* qlog_dir, int use_long_log,
     int client_cnx_id_length, char const* cc_algo_id,
     int nb_client_queries, char const** client_query_text);
 int quicdoq_demo_client_init_context(quicdoq_ctx_t* qd_client, quicdoq_demo_client_ctx_t * client_ctx, int nb_client_queries, char const** client_query_text,
@@ -124,7 +126,8 @@ int main(int argc, char** argv)
     const char* esni_key_file = NULL;
     const char* esni_rr_file = NULL;
     const char* log_file = NULL;
-    const char* bin_file = NULL;
+    const char* binlog_dir = NULL;
+    const char* qlog_dir = NULL;
     const char* sni = NULL;
     const char* alpn = NULL;
     const char* root_trust_file = NULL;
@@ -153,7 +156,7 @@ int main(int argc, char** argv)
 
     /* Get the parameters */
     int opt;
-    while ((opt = getopt(argc, argv, "c:k:K:E:l:b:Lp:e:m:n:a:rs:t:v:I:G:S:d:h")) != -1) {
+    while ((opt = getopt(argc, argv, "c:k:K:E:l:b:q:Lp:e:m:n:a:rs:t:v:I:G:S:d:h")) != -1) {
         switch (opt) {
         case 'c':
             server_cert_file = optarg;
@@ -171,7 +174,10 @@ int main(int argc, char** argv)
             log_file = optarg;
             break;
         case 'b':
-            bin_file = optarg;
+            binlog_dir = optarg;
+            break;
+        case 'q':
+            qlog_dir = optarg;
             break;
         case 'L':
             use_long_log = 1;
@@ -268,13 +274,13 @@ int main(int argc, char** argv)
         }
 
         ret = quicdoq_client(server_name, server_port, dest_if, sni, esni_rr_file, alpn, root_trust_file,
-            mtu_max, log_file, bin_file, use_long_log, client_cnx_id_length, cc_algo_id,
+            mtu_max, log_file, binlog_dir, qlog_dir, use_long_log, client_cnx_id_length, cc_algo_id,
             nb_client_queries, client_query_text);
     }
     else {
         /* start server using specified options */
         ret = quicdoq_demo_server(alpn, server_cert_file, server_key_file, esni_key_file, esni_rr_file, 
-            log_file, bin_file, backend_dns_server, solution_dir, use_long_log, server_port, dest_if, 
+            log_file, binlog_dir, qlog_dir, backend_dns_server, solution_dir, use_long_log, server_port, dest_if, 
             mtu_max, do_retry, reset_seed, cc_algo_id);
     }
 
@@ -293,7 +299,11 @@ void usage()
     fprintf(stderr, "  -K file               ESNI private key file (default: don't use ESNI)\n");
     fprintf(stderr, "  -E file               ESNI RR file (default: don't use ESNI)\n");
     fprintf(stderr, "  -l file               Log file, Log to stdout if file = \"n\". No logging if absent.\n");
-    fprintf(stderr, "  -b file               Binary log file. No binary logging if absent.\n");
+    fprintf(stderr, "  -b bin_dir            Binary logging to this directory. No binary logging if absent.\n");
+    fprintf(stderr, "  -q qlog_dir           Qlog logging to this directory. No qlog logging if absent,\n");
+    fprintf(stderr, "                        but qlogs could be extracted from binary logs using picolog\n");
+    fprintf(stderr, "                        if binary logs are available.\n");
+    fprintf(stderr, "                        Production of qlogs on servers affects performance.\n");
     fprintf(stderr, "  -L                    Log all packets. If absent, log stops after 100 packets.\n");
     fprintf(stderr, "  -p port               server port (default: %d)\n", QUICDOQ_PORT);
     fprintf(stderr, "  -e if                 Send on interface (default: -1)\n");
@@ -369,7 +379,7 @@ uint32_t parse_target_version(char const* v_arg)
 int quicdoq_demo_server(
     const char* alpn, const char* server_cert_file, const char* server_key_file,
     const char* esni_key_file, const char* esni_rr_file, const char* log_file,
-    const char* bin_file, const char* backend_dns_server, const char* solution_dir,
+    const char* binlog_dir, char const* qlog_dir, const char* backend_dns_server, const char* solution_dir,
     int use_long_log, int server_port, int dest_if, int mtu_max, int do_retry,
     uint64_t* reset_seed, char const * cc_algo_id)
 {
@@ -469,8 +479,12 @@ int quicdoq_demo_server(
             picoquic_set_textlog(quic, log_file);
         }
 
-        if (bin_file != NULL) {
-            picoquic_set_binlog(quic, bin_file);
+        if (binlog_dir != NULL) {
+            picoquic_set_binlog(quic, binlog_dir);
+        }
+
+        if (qlog_dir != NULL) {
+            picoquic_set_qlog(quic, qlog_dir);
         }
 
         picoquic_set_log_level(quic, use_long_log);
@@ -599,7 +613,7 @@ int quicdoq_demo_server(
 /* Quic Client */
 int quicdoq_client(const char* server_name, int server_port, int dest_if,
     const char* sni, const char* esni_rr_file, const char* alpn, const char* root_crt,
-    int mtu_max, const char* log_file, char const* bin_file, int use_long_log,
+    int mtu_max, const char* log_file, char const* binlog_dir, char const* qlog_dir, int use_long_log,
     int client_cnx_id_length, char const* cc_algo_id,
     int nb_client_queries, char const** client_query_text)
 {
@@ -676,8 +690,12 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
                 picoquic_set_textlog(qclient, log_file);
             }
 
-            if (bin_file != NULL) {
-                picoquic_set_binlog(qclient, bin_file);
+            if (binlog_dir != NULL) {
+                picoquic_set_binlog(qclient, binlog_dir);
+            }
+
+            if (qlog_dir != NULL) {
+                picoquic_set_qlog(qclient, qlog_dir);
             }
 
             picoquic_set_log_level(qclient, use_long_log);
