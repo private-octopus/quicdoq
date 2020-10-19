@@ -263,7 +263,7 @@ int main(int argc, char** argv)
         }
 
         if (optind < argc) {
-            client_query_text = argv + optind;
+            client_query_text = (const char **)(argv + optind);
             nb_client_queries = argc - optind;
         }
         else {
@@ -393,7 +393,6 @@ int quicdoq_demo_server(
     struct sockaddr_storage addr_from;
     struct sockaddr_storage addr_to;
     int if_index_to;
-    int nb_loops = 0;
     uint8_t buffer[PICOQUIC_MAX_PACKET_SIZE];
     uint8_t send_buffer[PICOQUIC_MAX_PACKET_SIZE];
     FILE* F_log = NULL;
@@ -410,7 +409,7 @@ int quicdoq_demo_server(
         solution_dir = "..\\..\\picoquic";
 #endif
 #else
-        solution_dir = "..\picoquic";
+        solution_dir = "../picoquic";
 #endif
     }
 
@@ -578,7 +577,6 @@ int quicdoq_demo_server(
                 }
 
                 if (ret == 0 && send_length > 0) {
-                    nb_loops = 0;
                     (void)picoquic_send_through_server_sockets(&server_sockets,
                         (struct sockaddr*) & peer_addr,(struct sockaddr*) & local_addr, if_index,
                         (const char*)send_buffer, (int)send_length, NULL);
@@ -797,7 +795,7 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
     }
 
     if (F_log != NULL) {
-        F_log = picoquic_file_close(F_log);
+        picoquic_file_close(F_log);
     }
 
     return ret;
@@ -907,6 +905,9 @@ void quicdoq_demo_client_reset_context(quicdoq_ctx_t* qd_client, quicdoq_demo_cl
                 quicdoq_delete_query_ctx(client_ctx->query_ctx[i]);
                 client_ctx->query_ctx[i] = NULL;
             }
+        }
+        if (client_ctx->is_query_complete != NULL) {
+            free(client_ctx->is_query_complete);
         }
         free(client_ctx->query_ctx);
         client_ctx->query_ctx = NULL;
