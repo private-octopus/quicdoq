@@ -9,8 +9,8 @@ find_path(Picoquic_INCLUDE_DIR
 
 find_path(Picoquic_BINLOG_DIR
     NAMES autoqlog.h
-    HINTS ${CMAKE_SOURCE_DIR}/../picoquic/binlog
-          ${CMAKE_BINARY_DIR}/../picoquic/binlog
+    HINTS ${CMAKE_SOURCE_DIR}/../picoquic/loglib
+          ${CMAKE_BINARY_DIR}/../picoquic/loglib
           ../picotls/picoquic/ )
 
 set(Picoquic_HINTS ${CMAKE_BINARY_DIR}/../picoquic ../picoquic)
