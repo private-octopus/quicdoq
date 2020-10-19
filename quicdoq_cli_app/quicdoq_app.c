@@ -795,7 +795,7 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
     }
 
     if (F_log != NULL) {
-        F_log = picoquic_file_close(F_log);
+        picoquic_file_close(F_log);
     }
 
     return ret;
@@ -905,6 +905,9 @@ void quicdoq_demo_client_reset_context(quicdoq_ctx_t* qd_client, quicdoq_demo_cl
                 quicdoq_delete_query_ctx(client_ctx->query_ctx[i]);
                 client_ctx->query_ctx[i] = NULL;
             }
+        }
+        if (client_ctx->is_query_complete != NULL) {
+            free(client_ctx->is_query_complete);
         }
         free(client_ctx->query_ctx);
         client_ctx->query_ctx = NULL;
