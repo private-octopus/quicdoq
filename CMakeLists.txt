@@ -45,6 +45,21 @@ add_library(quicdoq-core
     ${QUICDOQ_LIBRARY_FILES}
 )
 
+add_executable(quicdoq_app
+    quicdoq_cli_app/quicdoq_app.c
+)
+
+target_link_libraries(quicdoq_app
+    quicdoq-core
+    ${Picoquic_LIBRARIES}
+    ${PTLS_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
+    ${CMAKE_DL_LIBS}
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+
+set(TEST_EXES quicdoq_t)
+
 add_executable(quicdoq_t
     quicdoq_cli_test/quicdoq_t.c
     ${QUICDOQ_TEST_LIBRARY_FILES}
