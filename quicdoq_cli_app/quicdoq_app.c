@@ -87,6 +87,9 @@
 
 #endif
 
+#include "picoquic_binlog.h"
+#include "picoquic_logger.h"
+
 typedef struct st_quicdoq_demo_client_ctx_t {
     quicdoq_ctx_t* qd_client;
     char test_server_cert_store_file[512];
