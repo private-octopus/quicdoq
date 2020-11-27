@@ -542,15 +542,15 @@ int quicdoq_check_tp(quicdoq_cnx_ctx_t* cnx_ctx, picoquic_cnx_t* cnx)
     picoquic_tp_t const* tp = picoquic_get_transport_parameters(cnx, 0);
 
     if (cnx_ctx->is_server) {
-        if (tp->initial_max_stream_data_bidi_local != QUICDOQ_MAX_STREAM_DATA)
+        if (tp->initial_max_stream_data_bidi_local < QUICDOQ_MAX_STREAM_DATA)
         {
-            ret = -1;
+            picoquic_log_app_message(cnx, "Recive max stream bidir local < 65635: 0x%" PRIx64, tp->initial_max_stream_data_bidi_local);
         }
     }
     else {
-        if (tp->initial_max_stream_data_bidi_remote != QUICDOQ_MAX_STREAM_DATA)
+        if (tp->initial_max_stream_data_bidi_remote < QUICDOQ_MAX_STREAM_DATA)
         {
-            ret = -1;
+            picoquic_log_app_message(cnx, "Recive max stream bidir remote < 65635: 0x%" PRIx64, tp->initial_max_stream_data_bidi_remote);
         }
     }
 
