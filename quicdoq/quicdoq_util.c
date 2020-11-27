@@ -257,7 +257,7 @@ uint8_t* quicdog_format_dns_query(uint8_t* data, uint8_t* data_max, char const* 
         /* basic query header */
         *data++ = (uint8_t)(id >> 8);
         *data++ = (uint8_t)(id & 255);
-        *data++ = 0; /* QR = 0, opcode = 0; AA,TC,RD = 0*/
+        *data++ = 1; /* QR = 0, opcode = 0; AA,TC = 0, RD = 1 */
         *data++ = 0; /* RA,AD,CD=0, rcode=0 */
         *data++ = 0; *data++ = 1; /* qdcount = 0*/
         *data++ = 0; *data++ = 0; /* ancount = 0*/
