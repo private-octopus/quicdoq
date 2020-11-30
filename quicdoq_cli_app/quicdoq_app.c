@@ -560,6 +560,8 @@ int quicdoq_demo_server(
             do {
                 struct sockaddr_storage peer_addr;
                 struct sockaddr_storage local_addr;
+                picoquic_cnx_t *last_cnx = NULL;
+                picoquic_connection_id_t log_cid = { 0 };
                 int if_index = dest_if;
 
                 loop_time = picoquic_current_time();
@@ -576,13 +578,30 @@ int quicdoq_demo_server(
                 if (send_length == 0 && picoquic_get_next_wake_time(quicdoq_get_quic_ctx(qd_server), current_time) <= current_time) {
                     ret = picoquic_prepare_next_packet(quicdoq_get_quic_ctx(qd_server), loop_time,
                         send_buffer, sizeof(send_buffer), &send_length,
-                        &peer_addr, &local_addr, &if_index, NULL, NULL);
+                        &peer_addr, &local_addr, &if_index, &log_cid, &last_cnx);
                 }
 
                 if (ret == 0 && send_length > 0) {
-                    (void)picoquic_send_through_server_sockets(&server_sockets,
+                    int sock_err = 0;
+                    int sock_ret = picoquic_send_through_server_sockets(&server_sockets,
                         (struct sockaddr*) & peer_addr,(struct sockaddr*) & local_addr, if_index,
-                        (const char*)send_buffer, (int)send_length, NULL);
+                        (const char*)send_buffer, (int)send_length, &sock_err);
+                    if (sock_ret <= 0) {
+                        if (last_cnx == NULL) {
+                            picoquic_log_context_free_app_message(quicdoq_get_quic_ctx(qd_server), &log_cid, "Could not send message to AF_to=%d, AF_from=%d, if=%d, ret=%d, err=%d",
+                                peer_addr.ss_family, local_addr.ss_family, if_index, sock_ret, sock_err);
+                        }
+                        else {
+                            picoquic_log_app_message(last_cnx, "Could not send message to AF_to=%d, AF_from=%d, if=%d, ret=%d, err=%d",
+                                peer_addr.ss_family, local_addr.ss_family, if_index, sock_ret, sock_err);
+
+                            if (picoquic_socket_error_implies_unreachable(sock_err)) {
+                                picoquic_notify_destination_unreachable(last_cnx, current_time,
+                                    (struct sockaddr*) & peer_addr, (struct sockaddr*) & local_addr, if_index,
+                                    sock_err);
+                            }
+                        }
+                    }
                 }
 
             } while (ret == 0 && send_length > 0);
@@ -713,7 +732,7 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
     }
 
     /* Loop: wait for packets, send queries, until all queries served */
-    while (ret == 0 && !(client_ctx.all_queries_served && quicdoq_is_backlog_empty(qd_client))) {
+    while (ret == 0 && !(client_ctx.all_queries_served && quicdoq_is_closed(qd_client))) {
         bytes_recv = picoquic_select(&fd, 1, &packet_from,
             &packet_to, &if_index_to, &received_ecn,
             recv_buffer, sizeof(recv_buffer), delta_t, &current_time);
@@ -777,6 +796,10 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
                 delta_t = picoquic_get_next_wake_delay(qclient, current_time, delay_max);
             }
         }
+    }
+
+    if (ret == 0) {
+
     }
 
     if (qclient != NULL) {

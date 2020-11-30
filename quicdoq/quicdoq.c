@@ -707,7 +707,7 @@ int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* que
     return ret;
 }
 
-int quicdoq_is_backlog_empty(quicdoq_ctx_t* quicdoq_ctx)
+int quicdoq_is_closed(quicdoq_ctx_t* quicdoq_ctx)
 {
     quicdoq_cnx_ctx_t* cnx_ctx = quicdoq_ctx->first_cnx;
     int is_empty = 1;
@@ -718,6 +718,16 @@ int quicdoq_is_backlog_empty(quicdoq_ctx_t* quicdoq_ctx)
             break;
         }
         else {
+            picoquic_state_enum cnx_state = picoquic_get_cnx_state(cnx_ctx->cnx);
+            if (cnx_state < picoquic_state_disconnecting) {
+                picoquic_close(cnx_ctx->cnx, 0);
+                is_empty = 0;
+                break;
+            }
+            else if (cnx_state != picoquic_state_disconnected) {
+                is_empty = 0;
+                break;
+            }
             cnx_ctx = cnx_ctx->next_cnx;
         }
     }
