@@ -27,8 +27,6 @@ jobs:
           sudo apt-get install -y libssl-dev
           ./ci/build_picotls.sh
           ./ci/build_picoquic.sh
-          mkdir build
-          cd build
      
       # Build quicdoq and run tests
       - name: Make and run
@@ -36,6 +34,8 @@ jobs:
           languages: cpp
 
       - run: |
+          mkdir build
+          cd build
           cmake ..
           cmake --build .
           make
