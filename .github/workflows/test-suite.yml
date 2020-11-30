@@ -20,9 +20,6 @@ jobs:
 
       # Build picotls and picoquic.
       - name: Build dependencies
-        with:
-          languages: cpp
-
       - run: |
           sudo apt-get install -y libssl-dev
           ./ci/build_picotls.sh
@@ -30,9 +27,6 @@ jobs:
      
       # Build quicdoq and run tests
       - name: Make and run
-        with:
-          languages: cpp
-
       - run: |
           mkdir build
           cd build
