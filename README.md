@@ -37,6 +37,8 @@ project requires first managing the dependencies,
 [Picotls](https://github.com/h2o/picotls)
 and OpenSSL. 
 
+Alternatively, the directory `docker` contains a Dockerfile to build a container for quicdoq - See [Docker README](docker/README.md) for instructions.
+
 ## Quicdoq on Windows
 
 To build Picoquic on Windows, you need to:
