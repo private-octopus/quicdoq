@@ -1,0 +1,38 @@
+---
+name: "TestSuite"
+
+on:
+  push
+
+jobs:
+  analyze:
+    name: TestSuite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          # We must fetch at least the immediate parents so that if this is
+          # a pull request then we can checkout the head.
+          fetch-depth: 2
+          submodules: 'recursive'
+
+      # Build picotls and picoquic.
+      - run: |
+          sudo apt-get install -y libssl-dev
+          ./ci/build_picotls.sh
+          ./ci/build_picoquic.sh
+     
+      # Build quicdoq and run tests
+      - run: |
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build .
+          make
+          ulimit -c unlimited -S
+          ./quicdoq_t -n -S ../../picoquic && QDRESULT=$? 
+          if [ ${QDRESULT} == 0 ]; then exit 0; fi;
+          exit 1
+
