@@ -32,6 +32,8 @@ jobs:
           cmake --build .
           make
           ulimit -c unlimited -S
+          ls ..
+          ls ../..
           ./quicdoq_t basic
           ./quicdoq_t -n && QDRESULT=$? 
           if [ ${QDRESULT} == 0 ]; then exit 0; fi;
