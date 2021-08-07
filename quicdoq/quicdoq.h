@@ -114,8 +114,8 @@ extern "C" {
 #endif
 
 /* DoQ ALPN and DoQ port -- as defined in draft */
-#define QUICDOQ_ALPN "doq-i00"
-#define QUICDOQ_PORT 784
+#define QUICDOQ_ALPN "doq-i03"
+#define QUICDOQ_PORT 853
 
 /* DoQ error codes */
 #define QUICDOQ_ERROR_NO_ERROR 0x00
@@ -134,7 +134,8 @@ extern "C" {
     typedef enum {
         quicdoq_incoming_query = 0, /* Incoming callback query */
         quicdoq_query_cancelled, /* Query cancelled before response provided */
-        quicdoq_response_complete, /* The response to the current query arrived. */
+        quicdoq_response_complete, /* The last response to the current query arrived. */
+        quicdoq_response_partial, /* One of the first responses to a query has arrived */
         quicdoq_response_cancelled, /* The response to the current query was cancelled by the peer. */
         quicdoq_query_failed  /* Query failed for reasons other than cancelled. */
     } quicdoq_query_return_enum;
@@ -151,6 +152,9 @@ extern "C" {
         uint64_t current_time);
 
     /* Definition of the query context */
+    /* TODO: add a flag to indicate whether the query requires multiple responses?
+     * TODO: manage sending the length of the query, and the length of each response.
+     * if the query requires multiple responses, there will be chain of responses. */
     typedef struct st_quicdoq_query_ctx_t {
         char const* server_name; /* Server SNI in outgoing query, client SNI in incoming query */
         struct sockaddr* server_addr; /* Address of the target server */
@@ -184,7 +188,12 @@ extern "C" {
     void quicdoq_set_callback(quicdoq_ctx_t* ctx, quicdoq_app_cb_fn app_cb_fn, void* app_cb_ctx);
     picoquic_quic_t* quicdoq_get_quic_ctx(quicdoq_ctx_t* ctx);
 
-    /* Query context management functions 
+    /* Query context management functions
+     * TODO: if the query requires several response, there will be callbacks on the
+     * client side for each response. There will also be several calls on the
+     * server side for posting responses, and a flag to signal whether this is
+     * the last one.
+     *
      * Client side:
      *  - quicdoq_post_query(): Post a new query
      *  - quicdoq_cancel_query(): Abandon a previously posted query
@@ -194,7 +203,6 @@ extern "C" {
      *  - quicdoq_post_response(): provide the response
      *  - quicdoq_cancel_response(): terminate an incoming query without a response.
      */
-
 
     quicdoq_query_ctx_t* quicdoq_create_query_ctx(uint16_t query_length, uint16_t response_max_size);
 

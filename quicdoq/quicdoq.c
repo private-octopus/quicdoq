@@ -89,11 +89,11 @@ void quicdoq_delete_stream_ctx(quicdoq_cnx_ctx_t* cnx_ctx, quicdoq_stream_ctx_t*
 }
 
 /* On the data callback, fill the bytes in the relevant query field, and if needed signal the app. */
-
 int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx, uint64_t stream_id,
     uint8_t* bytes, size_t length, picoquic_call_back_event_t fin_or_event, quicdoq_cnx_ctx_t* cnx_ctx)
 {
     int ret = 0;
+    size_t consumed = 0;
 
     if (cnx_ctx->is_server) {
         if (stream_ctx == NULL) {
@@ -127,26 +127,47 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
         }
 
         if (ret == 0) {
-            if (stream_ctx->query_ctx->query_length + length > stream_ctx->query_ctx->query_max_size){
-                DBG_PRINTF("Incoming query too long for server stream  #%llu", (unsigned long long)stream_id);
-                picoquic_log_app_message(cnx, "Quicdoq: Incoming query too long for server stream  #%llu.\n", (unsigned long long)stream_id);
-                ret = -1;
+            /* First two bytes of stream are query length. 
+             * - must be stored when receiving.
+             * - must be compared against max query length. Or should this just always be 64K? 
+             * - then shall verify that all bytes are retrieved */
+            while (stream_ctx->bytes_received < 2 && consumed < length) {
+                stream_ctx->length_received *= 256;
+                stream_ctx->length_received += bytes[consumed++];
+                stream_ctx->bytes_received++;
             }
-            else {
-                /* Copy incoming data into query context */
-                memcpy(stream_ctx->query_ctx->query + stream_ctx->query_ctx->query_length,
-                    bytes, length);
-                stream_ctx->query_ctx->query_length += (uint16_t)length;
+            if (length > consumed) {
+                /* TODO: maybe allocate data for stated length instead of relying on max_query_size */
+                if (stream_ctx->length_received > stream_ctx->query_ctx->query_max_size) {
+                    DBG_PRINTF("Incoming query too long for server stream  #%llu", (unsigned long long)stream_id);
+                    picoquic_log_app_message(cnx, "Quicdoq: Incoming query too long for server stream  #%llu.\n", (unsigned long long)stream_id);
+                    ret = -1;
+                }
+                else if (stream_ctx->query_ctx->query_length + length - consumed > stream_ctx->length_received) {
+                    DBG_PRINTF("Incoming query longer than length for server stream  #%llu", (unsigned long long)stream_id);
+                    picoquic_log_app_message(cnx, "Quicdoq: Incoming query longer than length for server stream  #%llu.\n", (unsigned long long)stream_id);
+                    ret = -1;
+                }
+                else {
+                    /* Copy incoming data into query context */
+                    memcpy(stream_ctx->query_ctx->query + stream_ctx->query_ctx->query_length,
+                        bytes + consumed, length - consumed);
+                    stream_ctx->query_ctx->query_length += (uint16_t)(length - consumed);
 
-                if (fin_or_event == picoquic_callback_stream_fin) {
-                    /* Query has arrived, verify and then apply the call back */
-                    if (stream_ctx->query_ctx->query_length < 2 || stream_ctx->query_ctx->query[0] != 0 || stream_ctx->query_ctx->query[1] != 0) {
-                        ret = picoquic_close(cnx, QUICDOQ_ERROR_PROTOCOL);
-                    }
-                    else {
-                        ret = cnx_ctx->quicdoq_ctx->app_cb_fn(quicdoq_incoming_query,
-                            cnx_ctx->quicdoq_ctx->app_cb_ctx, stream_ctx->query_ctx,
-                            picoquic_get_quic_time(cnx_ctx->quicdoq_ctx->quic));
+                    if (fin_or_event == picoquic_callback_stream_fin) {
+                        /* Query has arrived, verify and then apply the call back */
+                        if (stream_ctx->query_ctx->query_length != stream_ctx->length_received) {
+                            DBG_PRINTF("Stream FIN before query was received fully on stream  #%llu", (unsigned long long)stream_id);
+                            picoquic_log_app_message(cnx, "Quicdoq: Stream FIN before query was received fully on stream  #%llu.\n", (unsigned long long)stream_id);
+                            ret = -1;
+                        } else  if (stream_ctx->query_ctx->query_length < 2 || stream_ctx->query_ctx->query[0] != 0 || stream_ctx->query_ctx->query[1] != 0) {
+                            ret = picoquic_close(cnx, QUICDOQ_ERROR_PROTOCOL);
+                        }
+                        else {
+                            ret = cnx_ctx->quicdoq_ctx->app_cb_fn(quicdoq_incoming_query,
+                                cnx_ctx->quicdoq_ctx->app_cb_ctx, stream_ctx->query_ctx,
+                                picoquic_get_quic_time(cnx_ctx->quicdoq_ctx->quic));
+                        }
                     }
                 }
             }
@@ -159,18 +180,48 @@ int quicdoq_callback_data(picoquic_cnx_t* cnx, quicdoq_stream_ctx_t* stream_ctx,
             ret = -1;
         }
         else {
-            if (stream_ctx->query_ctx->response_length + length > stream_ctx->query_ctx->response_max_size) {
-                DBG_PRINTF("Incoming response too long for client stream  #%llu", (unsigned long long)stream_id);
-                picoquic_log_app_message(cnx, "Quicdoq: Incoming response too long for client stream  #%llu.\n", (unsigned long long)stream_id);
-                ret = -1;
+            while (consumed < length) {
+                /* Receive response length */
+                while (stream_ctx->bytes_received < 2 && consumed < length) {
+                    stream_ctx->length_received *= 256;
+                    stream_ctx->length_received += bytes[consumed++];
+                    stream_ctx->bytes_received++;
+                }
+                if (stream_ctx->length_received > stream_ctx->query_ctx->response_max_size) {
+                    DBG_PRINTF("Incoming response too long for client stream  #%llu", (unsigned long long)stream_id);
+                    picoquic_log_app_message(cnx, "Quicdoq: Incoming response too long for client stream  #%llu.\n", (unsigned long long)stream_id);
+                    ret = -1;
+                }
+                else if (stream_ctx->query_ctx->response_length + length - consumed > stream_ctx->length_received) {
+                    /* Another response is stacked after this one. */
+                    /* Finish receiving the current response */
+                    size_t to_be_consumed = stream_ctx->length_received - stream_ctx->query_ctx->response_length - (length - consumed);
+                    memcpy(stream_ctx->query_ctx->response + stream_ctx->query_ctx->response_length,
+                        bytes + consumed, to_be_consumed);
+                    consumed += to_be_consumed;
+                    /* then signal a partial response */
+                    ret = cnx_ctx->quicdoq_ctx->app_cb_fn(quicdoq_response_partial,
+                        cnx_ctx->quicdoq_ctx->app_cb_ctx, stream_ctx->query_ctx,
+                        picoquic_get_quic_time(cnx_ctx->quicdoq_ctx->quic));
+                    /* then reset the receive state */
+                    stream_ctx->query_ctx->response_length = 0;
+                    stream_ctx->length_received = 0;
+                }
+                else {
+                    /* Copy incoming data into query context */
+                    memcpy(stream_ctx->query_ctx->response + stream_ctx->query_ctx->response_length,
+                        bytes + consumed, length - consumed);
+                    stream_ctx->query_ctx->response_length += (uint16_t)(length - consumed);
+                    consumed = length;
+                }
             }
-            else {
-                /* Copy incoming data into query context */
-                memcpy(stream_ctx->query_ctx->response + stream_ctx->query_ctx->response_length,
-                    bytes, length);
-                stream_ctx->query_ctx->response_length += (uint16_t)length;
-
-                if (fin_or_event == picoquic_callback_stream_fin) {
+            
+            if (fin_or_event == picoquic_callback_stream_fin) {
+                if (stream_ctx->length_received < 2 || stream_ctx->length_received != stream_ctx->query_ctx->response_length) {
+                    DBG_PRINTF("Client stream closed before final response  #%llu", (unsigned long long)stream_id);
+                    picoquic_log_app_message(cnx, "Quicdoq: client stream closed before final response  #%llu.\n", (unsigned long long)stream_id);
+                    ret = -1;
+                } else {
                     /* Query has arrived, apply the call back */
                     ret = cnx_ctx->quicdoq_ctx->app_cb_fn(quicdoq_response_complete,
                         cnx_ctx->quicdoq_ctx->app_cb_ctx, stream_ctx->query_ctx,
@@ -193,11 +244,13 @@ int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, qu
     int ret = 0;
     uint8_t* data;
     size_t data_length;
+    size_t already_sent = 0;
 #ifdef _WINDOWS
     UNREFERENCED_PARAMETER(stream_id);
     UNREFERENCED_PARAMETER(cnx);
 #endif
-
+    /* TODO: this code assumes a single response per query. In order
+     * to support XFR and AXFR, need a way to push several responses */
     if (cnx_ctx->is_server) {
         data = stream_ctx->query_ctx->response;
         data_length = stream_ctx->query_ctx->response_length;
@@ -207,21 +260,27 @@ int quicdoq_callback_prepare_to_send(picoquic_cnx_t* cnx, uint64_t stream_id, qu
         data_length = stream_ctx->query_ctx->query_length;
     }
 
-    if (stream_ctx->bytes_sent < data_length){
+    if (stream_ctx->bytes_sent < data_length + 2) {
         uint8_t* buffer;
-        size_t available = data_length - stream_ctx->bytes_sent;
+        size_t available = data_length + 2 - stream_ctx->bytes_sent;
         int is_fin = 1;
 
         if (available > space) {
             available = space;
             is_fin = 0;
         }
-
         buffer = picoquic_provide_stream_data_buffer(context, available, is_fin, !is_fin);
         if (buffer != NULL) {
-            memcpy(buffer, data + stream_ctx->bytes_sent, available);
-            stream_ctx->bytes_sent += available;
-            ret = 0;
+            while (stream_ctx->bytes_sent < 2 && already_sent < space) {
+                buffer[already_sent] = (stream_ctx->bytes_sent == 0) ? ((uint8_t)(data_length >> 8)) : ((uint8_t)(data_length & 0xff));
+                stream_ctx->bytes_sent++;
+                already_sent++;
+            }
+            if (already_sent < space) {
+                memcpy(buffer + already_sent, data + stream_ctx->bytes_sent - 2, available - already_sent);
+                stream_ctx->bytes_sent += available - already_sent;
+                ret = 0;
+            }
 
             if (is_fin && cnx_ctx->is_server) {
                 /* delete the stream context for the server */
