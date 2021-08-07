@@ -1,11 +1,12 @@
 # quicdoq
 
 Quicdoq is a simple implementation of DNS over Quic, as specified in
-[draft-huitema-quic-dnsoquic](https://datatracker.ietf.org/doc/draft-huitema-quic-dnsoquic/).
+[draft-ietf-quic-dnsoquic](https://datatracker.ietf.org/doc/draft-ietf-quic-dnsoquic/).
 It is written in C, based on [Picoquic](https://github.com/private-octopus/picoquic).
 Like Picoquic itself, it has a dependency
 on the [Picotls implementation of TLS 1.3](https://github.com/h2o/picotls),
 and on the Crytographic Libraries of OpenSSL.
+The current code supports the version 03 of the draft, with ALPN "doq-i03".
 
 # Quicdoq components
 

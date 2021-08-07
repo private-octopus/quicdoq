@@ -81,6 +81,8 @@ typedef struct st_quicdoq_stream_ctx_t {
     quicdoq_cnx_ctx_t* cnx_ctx;
     quicdoq_query_ctx_t* query_ctx;
     size_t bytes_sent;
+    size_t bytes_received;
+    uint16_t length_received;
 
     unsigned int client_mode : 1;
 } quicdoq_stream_ctx_t;
