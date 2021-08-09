@@ -390,9 +390,11 @@ size_t quicdoq_skip_dns_name(const uint8_t* packet, size_t length, size_t start)
 {
     size_t l = 0;
     size_t start_next = 0;
+    int nb_loops = 0;
 
-    while (start < length) {
+    while (start < length && nb_loops < 64) {
         l = packet[start];
+        nb_loops++;
 
         if (l == 0)
         {
@@ -411,8 +413,8 @@ size_t quicdoq_skip_dns_name(const uint8_t* packet, size_t length, size_t start)
             {
                 /* error */
                 start_next = length;
-                break;
             }
+            break;
         }
         else if (l > 0x3F)
         {

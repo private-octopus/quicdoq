@@ -752,6 +752,99 @@ int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx)
     return picoquic_mark_active_stream(cnx_ctx->cnx, stream_ctx->stream_id, 1, stream_ctx);
 }
 
+
+int quicdog_format_refuse_response(
+    uint8_t* query, size_t query_length,
+    uint8_t* response, size_t response_max_size, size_t* response_length,
+    uint16_t extended_dns_error)
+{
+    int ret = -1;
+
+    if (query_length <= (size_t)response_max_size && query_length > 12) {
+        /* Find the length of all queries */
+        int nb_queries = query[4] * 256 + query[5];
+        size_t after_q = 12;
+        size_t r_len = 0;
+        for (int q_index = 0; q_index < nb_queries && after_q < query_length; q_index++) {
+            /* Parse the DNS query to find the end of the first query */
+            after_q = quicdoq_skip_dns_name(query, query_length, after_q);
+            if (after_q + 4 <= query_length) {
+                after_q += 4;
+                ret = 0;
+            }
+            else {
+                after_q = query_length;
+                ret = -1;
+                break;
+            }
+        }
+        if (ret == 0) {
+            /* Copy the query into the response */
+            memcpy(response, query, after_q);
+            /* Set the QR bit to 1 */
+            response[2] |= 128;
+            /* Set the response code to refused */
+            response[3] = (query[3] & 0xF0) | 5;
+            /* Set the AN, NS, AD counts to 0 */
+            memset(response + 6, 0, 6);
+            r_len = after_q;
+            /* If the query might have included OPT and there is room, add an OPT RR */
+            if (r_len < query_length && r_len + 15 <= response_max_size) {
+                /* Set AD count to 1 */
+                response[11] = 1;
+                /* Format OPT
+                 * Field Name 	Field Type 	Description
+                 * NAME     domain name  MUST be 0 (root domain)
+                 * TYPE     u_int16_t    OPT (41)
+                 * CLASS    u_int16_t    requestor's UDP payload size
+                 * TTL      u_int32_t    extended RCODE and flags
+                 * RDLEN    u_int16_t    length of all RDATA
+                 * RDATA 	octet stream {attribute,value} pairs
+                 * -- Option 15 (EDE), L(2), 16 bits
+                 */
+                response[r_len++] = 0; /* NAME */
+                response[r_len++] = 0; response[r_len++] = 41; /* TYPE OPT */
+                response[r_len++] = 0xff; response[r_len++] = 0xff; /* payload size 0xFFFF */
+                response[r_len++] = 0; /* Not using extended r_code */
+                response[r_len++] = 0; /* EDNS version */
+                response[r_len++] = 0; response[r_len++] = 0; /* Flags = 0 */
+                response[r_len++] = 0; response[r_len++] = 4; /* RDLEN = 4 */
+                response[r_len++] = 15; /* EDE */
+                response[r_len++] = 2; /* L = 2 */
+                response[r_len++] = (uint8_t)(extended_dns_error >> 8); /* EDE, MSB */
+                response[r_len++] = (uint8_t)(extended_dns_error & 0xFF); /* EDE, LSB */
+            }
+            /* Success */
+            *response_length = r_len;
+            ret = 0;
+        }
+    }
+
+    return ret;
+}
+
+int quicdoq_refuse_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint16_t extended_dns_error)
+{
+    int ret = 0;
+    if (quicdoq_ctx == NULL || query_ctx == NULL) {
+        ret = -1;
+    }
+    else {
+        quicdoq_stream_ctx_t* stream_ctx = (quicdoq_stream_ctx_t*)query_ctx->client_cb_ctx;
+        quicdoq_cnx_ctx_t* cnx_ctx = stream_ctx->cnx_ctx;
+        /* Store the response */
+        ret = quicdog_format_refuse_response(query_ctx->query, query_ctx->query_length, query_ctx->response,
+            query_ctx->response_max_size, &query_ctx->response_length, extended_dns_error);
+        if (ret == 0) {
+            picoquic_log_app_message(cnx_ctx->cnx, "Query #%d refused with EDE 0x%x at cnx time: %"PRIu64 "us.\n", 
+                query_ctx->query_id, extended_dns_error, picoquic_get_quic_time(query_ctx->quic) - picoquic_get_cnx_start_time(cnx_ctx->cnx));
+            return picoquic_mark_active_stream(cnx_ctx->cnx, stream_ctx->stream_id, 1, stream_ctx);
+        }
+    }
+
+    return ret;
+}
+
 int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint16_t error_code)
 {
     int ret = 0;

@@ -214,6 +214,13 @@ extern "C" {
 
     int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx);
 
+    int quicdog_format_refuse_response(
+        uint8_t* query, size_t query_length,
+        uint8_t* response, size_t response_max_size, size_t* response_length,
+        uint16_t extended_dns_error);
+
+    int quicdoq_refuse_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint16_t extended_dns_error);
+
     int quicdoq_cancel_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* query_ctx, uint16_t error_code);
 
     int quicdoq_is_closed(quicdoq_ctx_t* quicdoq_ctx);

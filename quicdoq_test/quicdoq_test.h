@@ -39,6 +39,7 @@ int quicdoq_multi_queries_test();
 int quicdoq_multi_udp_test();
 int quicdoq_one_loss_test();
 int quicdoq_one_loss_udp_test();
+int dns_refuse_format_test();
 
 #ifdef __cplusplus
 }
