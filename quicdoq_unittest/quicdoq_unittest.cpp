@@ -86,5 +86,12 @@ namespace quicdoqunittest
 
 			Assert::AreEqual(ret, 0);
 		}
+
+		TEST_METHOD(dns_refuse_format)
+		{
+			int ret = dns_refuse_format_test();
+
+			Assert::AreEqual(ret, 0);
+		}
 	};
 }

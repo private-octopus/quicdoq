@@ -285,3 +285,121 @@ int rr_name_parse_test()
 
     return ret;
 }
+
+/* Refuse format:
+ * Check conditions based on input queries:
+ * - bare
+ * - extended
+ * - multiple
+ * - malformed
+ * Verify that formatted response is as expected 
+ */
+
+static uint8_t dnscode_test_query_bare[] = { 1, 255, 1, 0,
+    0, 1, 0, 0, 0, 0, 0, 0,
+    7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
+};
+
+static uint8_t dnscode_test_query_edns[] = { 1, 255, 1, 0,
+    0, 1, 0, 0, 0, 0, 0, 1,
+    7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
+    0, 0, 41, 8, 0, 0, 0, 0, 0, 0, 0
+};
+
+static uint8_t dnscode_test_query_multiple[] = { 1, 255, 1, 0,
+    0, 2, 0, 0, 0, 0, 0, 1,
+    7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
+    3, 'w', 'w', 'w', 0xc0, 12, 0, 0, 1, 0,
+    0, 0, 41, 8, 0, 0, 0, 0, 0, 0, 0
+};
+
+static uint8_t dnscode_test_query_bad_format[] = { 1, 255, 1, 0,
+    0, 2, 0, 0, 0, 0, 0, 1,
+    7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 63, 0, 1, 0, 1,
+    0, 0, 41, 8, 0, 0, 0, 0, 0, 0, 0
+};
+
+static uint8_t dnscode_test_refuse_bare[] = { 1, 255, 0x81, 5,
+    0, 1, 0, 0, 0, 0, 0, 0,
+    7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
+};
+
+static uint8_t dnscode_test_refuse_edns[] = { 1, 255, 0x81, 5,
+    0, 1, 0, 0, 0, 0, 0, 1,
+    7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
+    0, 0, 41, 255, 255, 0, 0, 0, 0, 0, 4, 15, 2, 0, 24
+};
+
+static uint8_t dnscode_test_refuse_multiple[] = { 1, 255, 0x81, 5,
+    0, 2, 0, 0, 0, 0, 0, 1,
+    7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
+    3, 'w', 'w', 'w', 0xc0, 12, 0, 0, 1, 0,
+    0, 0, 41, 255, 255, 0, 0, 0, 0, 0, 4, 15, 2, 0, 25
+};
+
+int refuse_format_test_one(uint8_t* query, size_t query_length, int expected_ret, uint8_t* response, size_t response_length, uint16_t extended_dns_error)
+{
+    int ret = 0;
+    int r_ret;
+    uint8_t refused[1024];
+    size_t refused_length;
+
+    r_ret = quicdoq_format_refuse_response(query, query_length, refused, sizeof(refused), &refused_length, extended_dns_error);
+
+    if (r_ret != expected_ret) {
+        ret = -1;
+    }
+    else if (r_ret == 0) {
+        if (refused_length != response_length) {
+            ret = -1;
+        }
+        else if (memcmp(refused, response, response_length) != 0) {
+            ret = -1;
+        }
+    }
+
+    return ret;
+}
+
+int dns_refuse_format_test()
+{
+    int ret = 0;
+
+    if (ret == 0) {
+        ret = refuse_format_test_one(dnscode_test_query_bare, sizeof(dnscode_test_query_bare),
+            0, dnscode_test_refuse_bare, sizeof(dnscode_test_refuse_bare), 24);
+        if (ret != 0) {
+            DBG_PRINTF("%s", "Refused format bare test fails.");
+            ret = -1;
+        }
+    }
+
+    if (ret == 0) {
+        ret = refuse_format_test_one(dnscode_test_query_edns, sizeof(dnscode_test_query_edns),
+            0, dnscode_test_refuse_edns, sizeof(dnscode_test_refuse_edns), 24);
+        if (ret != 0) {
+            DBG_PRINTF("%s", "Refused format edns test fails.");
+            ret = -1;
+        }
+    }
+
+    if (ret == 0) {
+        ret = refuse_format_test_one(dnscode_test_query_multiple, sizeof(dnscode_test_query_multiple),
+            0, dnscode_test_refuse_multiple, sizeof(dnscode_test_refuse_multiple), 25);
+        if (ret != 0) {
+            DBG_PRINTF("%s", "Refused format multiple test fails.");
+            ret = -1;
+        }
+    }
+
+    if (ret == 0) {
+        ret = refuse_format_test_one(dnscode_test_query_bad_format, sizeof(dnscode_test_query_bad_format),
+            -1, NULL, 0, 25);
+        if (ret != 0) {
+            DBG_PRINTF("%s", "Refused format bad_format test fails.");
+            ret = -1;
+        }
+    }
+
+    return ret;
+}
