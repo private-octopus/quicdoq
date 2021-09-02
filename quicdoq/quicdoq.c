@@ -753,7 +753,7 @@ int quicdoq_post_response(quicdoq_query_ctx_t* query_ctx)
 }
 
 
-int quicdog_format_refuse_response(
+int quicdoq_format_refuse_response(
     uint8_t* query, size_t query_length,
     uint8_t* response, size_t response_max_size, size_t* response_length,
     uint16_t extended_dns_error)
@@ -833,7 +833,7 @@ int quicdoq_refuse_response(quicdoq_ctx_t* quicdoq_ctx, quicdoq_query_ctx_t* que
         quicdoq_stream_ctx_t* stream_ctx = (quicdoq_stream_ctx_t*)query_ctx->client_cb_ctx;
         quicdoq_cnx_ctx_t* cnx_ctx = stream_ctx->cnx_ctx;
         /* Store the response */
-        ret = quicdog_format_refuse_response(query_ctx->query, query_ctx->query_length, query_ctx->response,
+        ret = quicdoq_format_refuse_response(query_ctx->query, query_ctx->query_length, query_ctx->response,
             query_ctx->response_max_size, &query_ctx->response_length, extended_dns_error);
         if (ret == 0) {
             picoquic_log_app_message(cnx_ctx->cnx, "Query #%d refused with EDE 0x%x at cnx time: %"PRIu64 "us.\n", 

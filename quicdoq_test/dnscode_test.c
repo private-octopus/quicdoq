@@ -344,7 +344,7 @@ int refuse_format_test_one(uint8_t* query, size_t query_length, int expected_ret
     uint8_t refused[1024];
     size_t refused_length;
 
-    r_ret = quicdog_format_refuse_response(query, query_length, refused, sizeof(refused), &refused_length, extended_dns_error);
+    r_ret = quicdoq_format_refuse_response(query, query_length, refused, sizeof(refused), &refused_length, extended_dns_error);
 
     if (r_ret != expected_ret) {
         ret = -1;
