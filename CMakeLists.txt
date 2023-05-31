@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 2.8.11)
-cmake_policy(SET CMP0003 NEW)
+cmake_minimum_required(VERSION 3.13)
 project(quicdoq C CXX)
 find_package (Threads REQUIRED)
 
