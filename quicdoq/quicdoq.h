@@ -113,20 +113,26 @@
 extern "C" {
 #endif
 
-/* DoQ ALPN and DoQ port -- as defined in draft */
-#define QUICDOQ_ALPN "doq-i03"
+#define QUICDOQ_VERSION "1.0.0.0"
+
+/* DoQ ALPN and DoQ port -- as defined in RFC 9250 */
+#define QUICDOQ_ALPN "doq"
 #define QUICDOQ_PORT 853
 
 /* DoQ error codes */
 #define QUICDOQ_ERROR_NO_ERROR 0x00
 #define QUICDOQ_ERROR_INTERNAL 0x01
 #define QUICDOQ_ERROR_PROTOCOL 0x02
+#define QUICDOQ_ERROR_REQUEST_CANCELLED 0x03
+#define QUICDOQ_ERROR_EXCESSIVE_LOAD 0x04
+#define QUICDOQ_ERROR_UNSPECIFIED_ERROR 0x05
+#define QUICDOQ_ERROR_RESERVED 0xd098ea5e     
 
 #define QUICDOQ_ERROR_RESPONSE_TOO_LONG 0x202
 #define QUICDOQ_ERROR_RESPONSE_TIME_OUT 0x203
 #define QUICDOQ_ERROR_QUERY_TOO_LONG 0x204
 
-/* Max stream size, per draft */
+/* Max stream size, per RFC */
 #define QUICDOQ_MAX_STREAM_DATA 0xffff
 
 /* Doq client return codes

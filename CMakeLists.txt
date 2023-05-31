@@ -11,6 +11,11 @@ if(DISABLE_DEBUG_PRINTF)
     set(CMAKE_C_FLAGS "-DDISABLE_DEBUG_PRINTF ${CMAKE_C_FLAGS}")
 endif()
 
+project(quicdoq
+        VERSION 1.0.0.0
+        DESCRIPTION "quicdoq library and demo app"
+        LANGUAGES C CXX)
+
 set(QUICDOQ_LIBRARY_FILES
     quicdoq/quicdoq.c
     quicdoq/quicdoq_util.c
