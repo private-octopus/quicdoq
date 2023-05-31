@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 2.8.11)
-cmake_policy(SET CMP0003 NEW)
+cmake_minimum_required(VERSION 3.13)
 project(quicdoq C CXX)
 find_package (Threads REQUIRED)
 
@@ -10,6 +9,11 @@ set(CMAKE_C_FLAGS "-std=c99 -Wall -Werror -O2 -g ${CC_WARNING_FLAGS} ${CMAKE_C_F
 if(DISABLE_DEBUG_PRINTF)
     set(CMAKE_C_FLAGS "-DDISABLE_DEBUG_PRINTF ${CMAKE_C_FLAGS}")
 endif()
+
+project(quicdoq
+        VERSION 1.0.0.0
+        DESCRIPTION "quicdoq library and demo app"
+        LANGUAGES C CXX)
 
 set(QUICDOQ_LIBRARY_FILES
     quicdoq/quicdoq.c
