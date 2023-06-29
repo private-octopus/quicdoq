@@ -466,6 +466,11 @@ void quicdoq_test_ctx_delete(quicdog_test_ctx_t* test_ctx)
         test_ctx->udp_link_out = NULL;
     }
 
+    if (test_ctx->record != NULL) {
+        free(test_ctx->record);
+	test_ctx->record = NULL;
+    }
+
     free(test_ctx);
 }
 
