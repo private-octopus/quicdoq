@@ -715,6 +715,7 @@ const quicdoq_rr_entry_t rr_table[] = {
     { "OPENPGPKEY", 61},
     { "CSYNC", 62},
     { "ZONEMD", 63},
+    { "HTTPS", 65},
     { "SPF", 99},
     { "UINFO", 100},
     { "UID", 101},
