@@ -106,12 +106,12 @@ void usage();
 uint32_t parse_target_version(char const* v_arg);
 int quicdoq_demo_server(
     const char* alpn, const char* server_cert_file, const char* server_key_file,
-    const char* esni_key_file, const char* esni_rr_file, const char* log_file,
+    const char* log_file,
     const char* binlog_dir, char const* qlog_dir, const char* backend_dns_server, const char* solution_dir,
     int use_long_log, int server_port, int dest_if, int mtu_max, int do_retry,
     uint64_t* reset_seed, char const* cc_algo_id);
 int quicdoq_client(const char* server_name, int server_port, int dest_if,
-    const char* sni, const char* esni_rr_file, const char* alpn, const char* root_crt,
+    const char* sni, const char* alpn, const char* root_crt,
     int mtu_max, const char* log_file, char const* binlog_dir, char const* qlog_dir, int use_long_log,
     int client_cnx_id_length, char const* cc_algo_id,
     int nb_client_queries, char const** client_query_text);
@@ -126,8 +126,6 @@ int main(int argc, char** argv)
     const char* server_name = NULL;
     const char* server_cert_file = NULL;
     const char* server_key_file = NULL;
-    const char* esni_key_file = NULL;
-    const char* esni_rr_file = NULL;
     const char* log_file = NULL;
     const char* binlog_dir = NULL;
     const char* qlog_dir = NULL;
@@ -159,19 +157,13 @@ int main(int argc, char** argv)
 
     /* Get the parameters */
     int opt;
-    while ((opt = getopt(argc, argv, "c:k:K:E:l:b:q:Lp:e:m:n:a:rs:t:v:I:G:S:d:h")) != -1) {
+    while ((opt = getopt(argc, argv, "c:k:l:b:q:Lp:e:m:n:a:rs:t:v:I:G:S:d:h")) != -1) {
         switch (opt) {
         case 'c':
             server_cert_file = optarg;
             break;
         case 'k':
             server_key_file = optarg;
-            break;
-        case 'K':
-            esni_key_file = optarg;
-            break;
-        case 'E':
-            esni_rr_file = optarg;
             break;
         case 'l':
             log_file = optarg;
@@ -276,13 +268,13 @@ int main(int argc, char** argv)
             nb_client_queries = 1;
         }
 
-        ret = quicdoq_client(server_name, server_port, dest_if, sni, esni_rr_file, alpn, root_trust_file,
+        ret = quicdoq_client(server_name, server_port, dest_if, sni, alpn, root_trust_file,
             mtu_max, log_file, binlog_dir, qlog_dir, use_long_log, client_cnx_id_length, cc_algo_id,
             nb_client_queries, client_query_text);
     }
     else {
         /* start server using specified options */
-        ret = quicdoq_demo_server(alpn, server_cert_file, server_key_file, esni_key_file, esni_rr_file, 
+        ret = quicdoq_demo_server(alpn, server_cert_file, server_key_file, 
             log_file, binlog_dir, qlog_dir, backend_dns_server, solution_dir, use_long_log, server_port, dest_if, 
             mtu_max, do_retry, reset_seed, cc_algo_id);
     }
@@ -299,8 +291,6 @@ void usage()
     fprintf(stderr, "  -c file               cert file (default: %s)\n", SERVER_CERT_FILE);
     fprintf(stderr, "  -h                    This help message\n");
     fprintf(stderr, "  -k file               key file (default: %s)\n", SERVER_KEY_FILE);
-    fprintf(stderr, "  -K file               ESNI private key file (default: don't use ESNI)\n");
-    fprintf(stderr, "  -E file               ESNI RR file (default: don't use ESNI)\n");
     fprintf(stderr, "  -l file               Log file, Log to stdout if file = \"n\". No logging if absent.\n");
     fprintf(stderr, "  -b bin_dir            Binary logging to this directory. No binary logging if absent.\n");
     fprintf(stderr, "  -q qlog_dir           Qlog logging to this directory. No qlog logging if absent,\n");
@@ -381,7 +371,7 @@ uint32_t parse_target_version(char const* v_arg)
 
 int quicdoq_demo_server(
     const char* alpn, const char* server_cert_file, const char* server_key_file,
-    const char* esni_key_file, const char* esni_rr_file, const char* log_file,
+    const char* log_file,
     const char* binlog_dir, char const* qlog_dir, const char* backend_dns_server, const char* solution_dir,
     int use_long_log, int server_port, int dest_if, int mtu_max, int do_retry,
     uint64_t* reset_seed, char const * cc_algo_id)
@@ -492,13 +482,6 @@ int quicdoq_demo_server(
         picoquic_set_log_level(quic, use_long_log);
 
         picoquic_set_key_log_file_from_env(quic);
-
-        if (esni_key_file != NULL && esni_rr_file != NULL) {
-            ret = picoquic_esni_load_key(quic, esni_key_file);
-            if (ret == 0) {
-                ret = picoquic_esni_server_setup(quic, esni_rr_file);
-            }
-        }
     }
 
     if (ret == 0) {
@@ -632,7 +615,7 @@ int quicdoq_demo_server(
 
 /* Quic Client */
 int quicdoq_client(const char* server_name, int server_port, int dest_if,
-    const char* sni, const char* esni_rr_file, const char* alpn, const char* root_crt,
+    const char* sni, const char* alpn, const char* root_crt,
     int mtu_max, const char* log_file, char const* binlog_dir, char const* qlog_dir, int use_long_log,
     int client_cnx_id_length, char const* cc_algo_id,
     int nb_client_queries, char const** client_query_text)
@@ -666,7 +649,6 @@ int quicdoq_client(const char* server_name, int server_port, int dest_if,
 
 #ifdef _WINDOWS
     UNREFERENCED_PARAMETER(dest_if);
-    UNREFERENCED_PARAMETER(esni_rr_file);
 #endif
 
     current_time = picoquic_current_time();
