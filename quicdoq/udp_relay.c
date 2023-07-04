@@ -307,4 +307,5 @@ void quicdoq_delete_udp_ctx(quicdoq_udp_ctx_t* udp_ctx)
     }
 
     free(quq_ctx);
+    free(udp_ctx);
 }

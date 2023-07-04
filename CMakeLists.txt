@@ -15,6 +15,49 @@ project(quicdoq
         DESCRIPTION "quicdoq library and demo app"
         LANGUAGES C CXX)
 
+include(CheckCCompilerFlag)
+include(CheckCXXCompilerFlag)
+include(CMakePushCheckState)
+
+if(ENABLE_ASAN)
+    cmake_push_check_state()
+    set(CMAKE_REQUIRED_LIBRARIES "-fsanitize=address")
+    check_c_compiler_flag(-fsanitize=address C__fsanitize_address_VALID)
+    check_cxx_compiler_flag(-fsanitize=address CXX__fsanitize_address_VALID)
+    cmake_pop_check_state()
+    if(NOT C__fsanitize_address_VALID OR NOT CXX__fsanitize_address_VALID)
+        message(FATAL_ERROR "ENABLE_ASAN was requested, but not supported!")
+    endif()
+    set(CMAKE_C_FLAGS "-fsanitize=address ${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-fsanitize=address ${CMAKE_CXX_FLAGS}")
+endif()
+
+if(ENABLE_UBSAN)
+    cmake_push_check_state()
+    set(CMAKE_REQUIRED_LIBRARIES "-fsanitize=undefined")
+    check_c_compiler_flag(-fsanitize=undefined C__fsanitize_undefined_VALID)
+    check_cxx_compiler_flag(-fsanitize=undefined CXX__fsanitize_undefined_VALID)
+    cmake_pop_check_state()
+    if(NOT C__fsanitize_undefined_VALID OR NOT CXX__fsanitize_undefined_VALID)
+        message(FATAL_ERROR "ENABLE_UBSAN was requested, but not supported!")
+    endif()
+    set(CMAKE_C_FLAGS "-fsanitize=undefined ${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-fsanitize=undefined ${CMAKE_CXX_FLAGS}")
+
+    # Ease detecting of "Runtime errors". If such an error is found, print a verbose
+    # error report and exit the program
+    cmake_push_check_state()
+    set(CMAKE_REQUIRED_LIBRARIES "-fno-sanitize-recover")
+    check_c_compiler_flag(-fno-sanitize-recover C__fnosanitize_recover_VALID)
+    check_cxx_compiler_flag(-fno-sanitize-recover CXX__fnosanitize_recover_VALID)
+    cmake_pop_check_state()
+    if(NOT C__fnosanitize_recover_VALID OR NOT CXX__fnosanitize_recover_VALID)
+        message(FATAL_ERROR "ENABLE_UBSAN was requested, but fno-sanitize-recover is not supported!")
+    endif()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-sanitize-recover")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-sanitize-recover")
+endif()
+
 set(QUICDOQ_LIBRARY_FILES
     quicdoq/quicdoq.c
     quicdoq/quicdoq_util.c

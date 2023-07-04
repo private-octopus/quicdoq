@@ -70,7 +70,9 @@ void quicdoq_delete_stream_ctx(quicdoq_cnx_ctx_t* cnx_ctx, quicdoq_stream_ctx_t*
 {
     if (cnx_ctx != NULL && stream_ctx != NULL) {
         /* If this is a server stream, delete the query */
-
+        if (cnx_ctx->is_server && stream_ctx->query_ctx != NULL) {
+            quicdoq_delete_query_ctx(stream_ctx->query_ctx);
+        }
         /* Remove the links */
         if (stream_ctx->previous_stream == NULL) {
             cnx_ctx->first_stream = stream_ctx->next_stream;
