@@ -558,7 +558,7 @@ int quicdoq_set_default_tp(quicdoq_ctx_t* quicdoq_ctx)
     tp.initial_max_stream_data_uni = 0;
     tp.initial_max_data = 0x10000;
     tp.initial_max_stream_id_unidir = 0;
-    tp.idle_timeout = 20000;
+    tp.max_idle_timeout = 20000;
     tp.max_packet_size = 1232;
     tp.max_ack_delay = 10000;
     tp.active_connection_id_limit = 3;
@@ -585,7 +585,7 @@ void quicdoq_set_tp(picoquic_cnx_t * cnx)
     tp.initial_max_stream_data_uni = 0;
     tp.initial_max_data = 0x10000;
     tp.initial_max_stream_id_unidir = 0;
-    tp.idle_timeout = 20000;
+    tp.max_idle_timeout = 20000;
     tp.max_packet_size = 1232;
     tp.max_ack_delay = 10000;
     tp.active_connection_id_limit = 3;
